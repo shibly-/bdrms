@@ -1,0 +1,62 @@
+Residential Gas Billing & Management System
+Role: You are an expert Full-Stack Software Architect and Senior Engineer.
+Objective: Scaffold a monorepo or structured project for a Gas Billing Management System with three distinct user roles: Admin, Staff, and Standard User.
+
+1. Technical Stack
+Frontend: Next.js (React 19) with Tailwind CSS and Lucide React icons.
+
+Backend: NestJS (Modular Architecture).
+
+Database: PostgreSQL managed via Drizzle ORM.
+
+Auth: Implement role-based access control (RBAC) for Admin, Staff, and User.
+
+2. Core Data Schema & Relationships
+Building: id, name, building_no (opt), address_1, address_2, post_code.
+
+Flat/Apartment: id, flat_no, building_id (Foreign Key to Building).
+
+User Profiles:
+
+Standard User: Link to building_id and flat_id. Include: gas_meter_no, installation_date, activation_date.
+
+Staff User: user_name, full_name, phone, email, address, operation_area (opt).
+
+System Config: Single row table for gas_unit_name and gas_unit_price.
+
+3. Feature Requirements
+A. Administrative Controls (Admin Only)
+Management Dashboards: CRUD interfaces for Buildings, Flats, Staff, and Standard Users.
+
+Smart Forms: When creating a Standard User, auto-populate address fields (Address-1, Address-2, Post Code) based on the selected Building.
+
+Dynamic Selects: Flat/Apartment dropdown must filter based on the selected Building.
+
+B. Billing Management (Admin & Staff Access)
+Gas Meter Bill Generation:
+
+Logic: Usage Quantity = Current Reading - Previous Reading (Default Previous to 0 if null).
+
+Calculation: Total Bill = Usage Quantity * Global Gas Unit Price.
+
+OCR Integration: Implement a placeholder for an image scanner/OCR service (e.g., Tesseract.js or a specialized API) to populate the Current Reading from a photo. The field must remain editable for manual correction.
+
+Automated Data: Billing Date auto-populates; User/Flat details auto-fetch based on the selected Meter/User.
+
+Monthly Reporting: A list view filtering the current month's bills for all meters.
+
+C. User Interfaces
+Admin Panel: Login + high-level dashboard.
+
+Staff Portal: Login + Billing Generation tools + Operation Area view.
+
+User Portal: Registration, Login, and a personal dashboard to view billing history.
+
+4. Implementation Instructions
+Initialize the NestJS backend with Drizzle schema files mirroring the entities above.
+
+Set up Next.js with a shared UI component library (Shadcn UI preferred).
+
+Implement a specific service for Billing Logic to ensure calculations are handled server-side.
+
+Ensure strict RBAC middleware: Only Admins can modify User/Staff attributes or system configurations.
