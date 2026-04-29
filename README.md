@@ -1,6 +1,6 @@
 # BDRMS Monorepo
 
-Residential Gas Billing & Management System scaffold with role-based architecture.
+LPG Reticulation Billing System scaffold with role-based architecture.
 
 ## Stack
 
@@ -50,6 +50,12 @@ Generate migrations:
 
 ```bash
 npm run db:generate -w api
+```
+
+Default admin (after schema exists and `DATABASE_URL` points at that database): username `admin`, password `admin123`.
+
+```bash
+npm run seed:admin -w api
 ```
 
 ---

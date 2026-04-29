@@ -1,0 +1,156 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AppShell } from "@/components/app-shell";
+import { adminFetch } from "@/lib/admin-client";
+
+type BillingRow = {
+  billId: number;
+  billingDate: string;
+  userName: string;
+  fullName: string;
+  gasMeterNo: string;
+  buildingName: string;
+  flatNo: string;
+  previousReading: string;
+  currentReading: string;
+  usageQuantity: string;
+  unitPrice: string;
+  totalBill: string;
+};
+type Building = { id: number; name: string; buildingNo: string | null };
+type Flat = { id: number; flatNo: string; buildingId: number };
+
+export default function StaffGasBillingHistoryPage() {
+  const [buildings, setBuildings] = useState<Building[]>([]);
+  const [flats, setFlats] = useState<Flat[]>([]);
+  const [filters, setFilters] = useState({
+    month: new Date().toISOString().slice(0, 7),
+    userName: "",
+    gasMeterNo: "",
+    buildingId: "",
+    flatId: "",
+  });
+  const [rows, setRows] = useState<BillingRow[]>([]);
+  const [err, setErr] = useState("");
+  const [sortKey, setSortKey] = useState<"billingDate" | "userName" | "gasMeterNo" | "totalBill">("billingDate");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  useEffect(() => {
+    void adminFetch<Building[]>("/auth/buildings")
+      .then(setBuildings)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!filters.buildingId) {
+      setFlats([]);
+      return;
+    }
+    void adminFetch<Flat[]>(`/auth/buildings/${filters.buildingId}/flats`)
+      .then(setFlats)
+      .catch(() => setFlats([]));
+  }, [filters.buildingId]);
+
+  async function loadHistory(e?: FormEvent) {
+    e?.preventDefault();
+    try {
+      setErr("");
+      const params = new URLSearchParams(Object.entries(filters).filter(([, v]) => String(v).length > 0)).toString();
+      const res = await adminFetch<{ items: BillingRow[] }>(`/billing/history?${params}`);
+      setRows(res.items ?? []);
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : "Failed to load billing history.");
+    }
+  }
+
+  function toggleSort(next: "billingDate" | "userName" | "gasMeterNo" | "totalBill") {
+    if (sortKey === next) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(next);
+    setSortDir("asc");
+  }
+
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      const cmp = sortKey === "totalBill"
+        ? Number(a.totalBill) - Number(b.totalBill)
+        : String(a[sortKey] ?? "").localeCompare(String(b[sortKey] ?? ""));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [rows, sortKey, sortDir]);
+
+  return (
+    <AppShell
+      title="Gas Billing History"
+      subtitle="Staff view of generated gas bills with search filters."
+      menu={[
+        { href: "/staff", label: "Overview" },
+        { href: "/staff/profile", label: "Profile" },
+        { href: "/staff/gas-billing-form", label: "Gas Billing Form" },
+        { href: "/staff/gas-billing-history", label: "Gas Billing History" },
+      ]}
+    >
+      {err ? <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{err}</section> : null}
+      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 font-semibold">Filters</h2>
+        <form className="grid gap-3 md:grid-cols-6" onSubmit={loadHistory}>
+          <input type="month" className="rounded-md border border-zinc-300 p-2" value={filters.month} onChange={(e) => setFilters((v) => ({ ...v, month: e.target.value }))} />
+          <input className="rounded-md border border-zinc-300 p-2" placeholder="User Name" value={filters.userName} onChange={(e) => setFilters((v) => ({ ...v, userName: e.target.value }))} />
+          <input className="rounded-md border border-zinc-300 p-2" placeholder="Gas Meter No" value={filters.gasMeterNo} onChange={(e) => setFilters((v) => ({ ...v, gasMeterNo: e.target.value }))} />
+          <select className="rounded-md border border-zinc-300 p-2" value={filters.buildingId} onChange={(e) => setFilters((v) => ({ ...v, buildingId: e.target.value, flatId: "" }))}>
+            <option value="">Building No</option>
+            {buildings.map((b) => <option key={b.id} value={b.id}>{b.buildingNo ? `${b.buildingNo} (${b.name})` : b.name}</option>)}
+          </select>
+          <select className="rounded-md border border-zinc-300 p-2" value={filters.flatId} onChange={(e) => setFilters((v) => ({ ...v, flatId: e.target.value }))}>
+            <option value="">Flat No</option>
+            {flats.map((f) => <option key={f.id} value={f.id}>{f.flatNo}</option>)}
+          </select>
+          <button className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white">Apply Filters</button>
+        </form>
+      </section>
+      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 font-semibold">Billing List</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b border-zinc-200 text-left">
+                <th><button onClick={() => toggleSort("billingDate")} className="font-semibold">Date</button></th>
+                <th><button onClick={() => toggleSort("userName")} className="font-semibold">User</button></th>
+                <th><button onClick={() => toggleSort("gasMeterNo")} className="font-semibold">Meter</button></th>
+                <th>Building</th>
+                <th>Flat</th>
+                <th>Previous</th>
+                <th>Current</th>
+                <th>Usage (m³)</th>
+                <th>Unit Price</th>
+                <th><button onClick={() => toggleSort("totalBill")} className="font-semibold">Total Bill</button></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRows.map((r) => (
+                <tr key={r.billId} className="border-b border-zinc-100">
+                  <td className="py-2">{r.billingDate}</td>
+                  <td>{r.fullName} ({r.userName})</td>
+                  <td>{r.gasMeterNo}</td>
+                  <td>{r.buildingName}</td>
+                  <td>{r.flatNo}</td>
+                  <td>{r.previousReading}</td>
+                  <td>{r.currentReading}</td>
+                  <td>{r.usageQuantity}</td>
+                  <td>{r.unitPrice}</td>
+                  <td>{r.totalBill}</td>
+                </tr>
+              ))}
+              {sortedRows.length === 0 ? (
+                <tr><td className="py-3 text-zinc-500" colSpan={10}>No billing rows found.</td></tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </AppShell>
+  );
+}

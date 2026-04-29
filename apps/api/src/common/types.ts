@@ -1,7 +1,7 @@
 export enum UserRole {
-  Admin = "admin",
-  Staff = "staff",
-  User = "user",
+  Admin = 'admin',
+  Staff = 'staff',
+  User = 'user',
 }
 
 export type BillingPreview = {

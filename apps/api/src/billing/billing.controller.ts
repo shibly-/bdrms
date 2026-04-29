@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { UserRole } from '../common/types';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -32,15 +32,58 @@ export class BillingController {
     return { ocrReading };
   }
 
+  @Get('flat-context')
+  @Roles(UserRole.Admin, UserRole.Staff)
+  getFlatContext(@Query('flatId') flatId?: string) {
+    return this.billingService.getFlatBillingContext(Number(flatId));
+  }
+
+  @Post('generate')
+  @Roles(UserRole.Admin, UserRole.Staff)
+  generate(
+    @Req() req: { user?: { sub?: number } },
+    @Body()
+    body: {
+      flatId: number;
+      currentReading: number;
+      billingDate: string;
+      ocrImageUrl?: string;
+    },
+  ) {
+    return this.billingService.createGasBill({
+      ...body,
+      createdByUserId: req.user?.sub ?? null,
+    });
+  }
+
   @Get('monthly')
   @Roles(UserRole.Admin, UserRole.Staff)
-  getMonthly(@Query('month') month?: string) {
+  async getMonthly(@Query('month') month?: string) {
     const now = new Date();
-    return {
-      month:
-        month ??
-        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
-      items: [],
-    };
+    const targetMonth =
+      month ??
+      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const history = await this.billingService.listBillingHistory({
+      month: targetMonth,
+    });
+    return { month: targetMonth, ...history };
+  }
+
+  @Get('history')
+  @Roles(UserRole.Admin, UserRole.Staff)
+  getHistory(
+    @Query('month') month?: string,
+    @Query('userName') userName?: string,
+    @Query('gasMeterNo') gasMeterNo?: string,
+    @Query('buildingId') buildingId?: string,
+    @Query('flatId') flatId?: string,
+  ) {
+    return this.billingService.listBillingHistory({
+      month,
+      userName,
+      gasMeterNo,
+      buildingId: buildingId ? Number(buildingId) : undefined,
+      flatId: flatId ? Number(flatId) : undefined,
+    });
   }
 }

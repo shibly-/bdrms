@@ -43,3 +43,16 @@ The project should have a feature called Billing Management which includes:
 
 
 
+The project should have the following features:
+- Building management page, only admin can create & manage Building
+- Building should have following attributes: Building Name, Building No (Optional), Address-1, Address-2, Post Code
+- Flat/Apartment management page, only admin can create & manage Flat/Apartment
+- Flat/Apartment should have following attributes: Flat/Apartment No, Building Name (this should be drop-down and data should be populated from Building management table). 
+- Standard user management page, only admin can create & manage standard user
+- Staff user management page, only admin can create & manage staff user
+- Standard user should have following attributes: User Name, Full Name, Phone No, Email, Building Name (this should be drop-down and data should be populated from Building management table), Flat/Apartment No (this should be drop-down and data should be populated as per the Building Name selection), Address-1 (should be populated as per the Building Name selection), Address-2 (should be populated as per the Building Name selection), Post Code (should be populated as per the Building Name selection), Gas Meter No, Gas Meter Installation Date, Gas Meter Activation Date
+- Staff user should have following attributes: User Name, Full Name, Phone No, Email, Address, Operation Area Name (Optional)
+- Only admin can update the attributes of Standard user & staff user 
+- There should one configuration page which should following fields: Gas Unit Name, Gas Unit Price
+
+keep the Buildings, Flat/Apartments, Standard users, Staff users & Configuration menu visible after admin login and for admin user only

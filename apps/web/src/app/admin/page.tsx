@@ -1,72 +1,155 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Building2, Users, Wrench } from "lucide-react";
+import Link from "next/link";
+import { ReactNode, useEffect, useState } from "react";
+import { Building2, Home, LineChart, ReceiptText, Settings, UserRound, Users } from "lucide-react";
+import { AppShell } from "@/components/app-shell";
+import { adminFetch, getAccessToken } from "@/lib/admin-client";
 
-const BUILDINGS = [
-  { id: 1, name: "Green Tower", address1: "12 Lake View", address2: "Gulshan", postCode: "1212" },
-  { id: 2, name: "Blue Heights", address1: "88 Central Road", address2: "Banani", postCode: "1213" },
-];
-
-const FLATS = [
-  { id: 1, buildingId: 1, flatNo: "A-1" },
-  { id: 2, buildingId: 1, flatNo: "A-2" },
-  { id: 3, buildingId: 2, flatNo: "B-1" },
-];
+type DashboardStats = {
+  users: number;
+  staff: number;
+  buildings: number;
+  flats: number;
+  monthlyBillingCounts: { month: string; count: number }[];
+};
 
 export default function AdminPage() {
-  const [buildingId, setBuildingId] = useState<number>(1);
-  const selectedBuilding = useMemo(
-    () => BUILDINGS.find((item) => item.id === buildingId),
-    [buildingId],
-  );
-  const buildingFlats = useMemo(
-    () => FLATS.filter((item) => item.buildingId === buildingId),
-    [buildingId],
-  );
+  const [token, setToken] = useState("");
+  const [role, setRole] = useState("");
+  const [stats, setStats] = useState<DashboardStats>({
+    users: 0,
+    staff: 0,
+    buildings: 0,
+    flats: 0,
+    monthlyBillingCounts: [],
+  });
+
+  useEffect(() => {
+    setToken(getAccessToken());
+    setRole(window.localStorage.getItem("userRole") ?? "");
+  }, []);
+  const isAdminLoggedIn = token.length > 0 && role === "admin";
+  useEffect(() => {
+    if (!isAdminLoggedIn) return;
+    void adminFetch<DashboardStats>("/admin/dashboard-stats").then(setStats).catch(() => {});
+  }, [isAdminLoggedIn]);
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-6">
-      <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-      <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border p-4"><Building2 className="mb-2 h-4 w-4" />Buildings CRUD</div>
-        <div className="rounded-xl border p-4"><Users className="mb-2 h-4 w-4" />Users & Staff CRUD</div>
-        <div className="rounded-xl border p-4"><Wrench className="mb-2 h-4 w-4" />System Config CRUD</div>
-      </section>
+    <AppShell
+      title="Admin Dashboard"
+      subtitle="Use dedicated pages to manage buildings, flats, users, staff, configuration, and billing history."
+      menu={[
+        { href: "/admin", label: "Overview" },
+        { href: "/admin/buildings", label: "Buildings" },
+        { href: "/admin/flats", label: "Flats/Apartments" },
+        { href: "/admin/users", label: "Standard Users" },
+        { href: "/admin/staff", label: "Staff Users" },
+        { href: "/admin/gas-billing-form", label: "Gas Billing Form" },
+        { href: "/admin/gas-billing-history", label: "Gas Billing History" },
+        { href: "/admin/config", label: "Configuration" },
+      ]}
+    >
+      {!isAdminLoggedIn ? (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-200">
+          Please sign in as admin first. Dashboard data and management actions require admin token.
+        </section>
+      ) : null}
 
-      <section className="rounded-xl border p-5">
-        <h2 className="mb-4 font-semibold">Create Standard User</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="text-sm">
-            Building
-            <select
-              className="mt-1 w-full rounded-md border p-2"
-              value={buildingId}
-              onChange={(e) => setBuildingId(Number(e.target.value))}
-            >
-              {BUILDINGS.map((building) => (
-                <option key={building.id} value={building.id}>
-                  {building.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm">
-            Flat/Apartment
-            <select className="mt-1 w-full rounded-md border p-2">
-              {buildingFlats.map((flat) => (
-                <option key={flat.id} value={flat.id}>
-                  {flat.flatNo}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-sm">Address-1<input className="mt-1 w-full rounded-md border p-2" value={selectedBuilding?.address1 ?? ""} readOnly /></label>
-          <label className="text-sm">Address-2<input className="mt-1 w-full rounded-md border p-2" value={selectedBuilding?.address2 ?? ""} readOnly /></label>
-          <label className="text-sm">Post Code<input className="mt-1 w-full rounded-md border p-2" value={selectedBuilding?.postCode ?? ""} readOnly /></label>
-          <label className="text-sm">Gas Meter No<input className="mt-1 w-full rounded-md border p-2" placeholder="GM-XXXX" /></label>
-        </div>
-      </section>
-    </main>
+      {isAdminLoggedIn ? (
+        <section className="grid gap-4 md:grid-cols-4">
+          <StatCard label="Users" value={stats.users} icon={<UserRound className="h-4 w-4" />} />
+          <StatCard label="Staff" value={stats.staff} icon={<Users className="h-4 w-4" />} />
+          <StatCard label="Buildings" value={stats.buildings} icon={<Building2 className="h-4 w-4" />} />
+          <StatCard label="Flat/Apartments" value={stats.flats} icon={<Home className="h-4 w-4" />} />
+        </section>
+      ) : null}
+
+      {isAdminLoggedIn ? (
+        <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 className="mb-4 flex items-center gap-2 font-semibold text-zinc-900">
+            <LineChart className="h-4 w-4" /> Monthly Billing Counts
+          </h2>
+          <MiniLineChart points={stats.monthlyBillingCounts} />
+        </section>
+      ) : null}
+
+      {isAdminLoggedIn ? (
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <QuickLink href="/admin/buildings" icon={<Home className="h-4 w-4" />} title="Building Management" />
+          <QuickLink href="/admin/flats" icon={<Building2 className="h-4 w-4" />} title="Flat/Apartment Management" />
+          <QuickLink href="/admin/users" icon={<UserRound className="h-4 w-4" />} title="Standard User Management" />
+          <QuickLink href="/admin/staff" icon={<Users className="h-4 w-4" />} title="Staff User Management" />
+          <QuickLink href="/admin/gas-billing-form" icon={<ReceiptText className="h-4 w-4" />} title="Gas Billing Form" />
+          <QuickLink href="/admin/gas-billing-history" icon={<ReceiptText className="h-4 w-4" />} title="Gas Billing History" />
+          <QuickLink href="/admin/config" icon={<Settings className="h-4 w-4" />} title="Configuration Page" />
+        </section>
+      ) : null}
+    </AppShell>
+  );
+}
+
+function MiniLineChart({ points }: { points: { month: string; count: number }[] }) {
+  if (!points.length) {
+    return <p className="text-sm text-zinc-500">No billing data available yet.</p>;
+  }
+
+  const width = 720;
+  const height = 220;
+  const padX = 40;
+  const padY = 24;
+  const chartW = width - padX * 2;
+  const chartH = height - padY * 2;
+  const maxY = Math.max(...points.map((p) => p.count), 1);
+
+  const coords = points.map((p, i) => {
+    const x =
+      points.length === 1 ? width / 2 : padX + (i / (points.length - 1)) * chartW;
+    const y = padY + chartH - (p.count / maxY) * chartH;
+    return { ...p, x, y };
+  });
+  const d = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x},${c.y}`).join(" ");
+
+  return (
+    <div className="overflow-x-auto">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-56 min-w-[680px] w-full">
+        <line x1={padX} y1={height - padY} x2={width - padX} y2={height - padY} stroke="#d4d4d8" />
+        <line x1={padX} y1={padY} x2={padX} y2={height - padY} stroke="#d4d4d8" />
+        <path d={d} fill="none" stroke="#18181b" strokeWidth={2.5} />
+        {coords.map((c) => (
+          <g key={c.month}>
+            <circle cx={c.x} cy={c.y} r={3.5} fill="#18181b" />
+            <text x={c.x} y={height - 6} textAnchor="middle" fontSize="10" fill="#52525b">
+              {c.month}
+            </text>
+            <text x={c.x} y={c.y - 10} textAnchor="middle" fontSize="10" fill="#18181b">
+              {c.count}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function StatCard({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="mb-2 text-zinc-700 dark:text-zinc-300">{icon}</div>
+      <p className="text-sm text-zinc-600 dark:text-zinc-300">{label}</p>
+      <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">{value}</p>
+    </div>
+  );
+}
+
+function QuickLink({ href, icon, title }: { href: string; icon: ReactNode; title: string }) {
+  return (
+    <Link
+      href={href}
+      className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800"
+    >
+      <div className="mb-2 text-zinc-700 dark:text-zinc-300">{icon}</div>
+      <p className="font-medium text-zinc-900 dark:text-zinc-50">{title}</p>
+    </Link>
   );
 }
