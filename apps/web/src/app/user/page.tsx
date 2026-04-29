@@ -1,34 +1,47 @@
-import Link from "next/link";
+"use client";
+
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { adminFetch } from "@/lib/admin-client";
 
 export default function UserPage() {
+  const [unitName, setUnitName] = useState("Gas Unit");
+  const [unitPrice, setUnitPrice] = useState<number>(0);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    void adminFetch<{ gasUnitName: string; gasUnitPrice: number }>("/billing/unit-config")
+      .then((data) => {
+        setUnitName(data.gasUnitName || "Gas Unit");
+        setUnitPrice(Number(data.gasUnitPrice || 0));
+      })
+      .catch((e) => setErr(e instanceof Error ? e.message : "Failed to load gas unit price."));
+  }, []);
+
   return (
     <AppShell
       title="Resident Portal"
-      subtitle="Manage your profile, track billing history, and stay updated on monthly gas charges."
+      subtitle="Manage your profile and check personal gas billing history."
       menu={[
-        { href: "/user", label: "Dashboard" },
-        { href: "/user#account", label: "Account" },
-        { href: "/user#history", label: "Billing History" },
+        { href: "/user", label: "Overview" },
+        { href: "/user/profile", label: "Profile" },
+        { href: "/user/gas-billing-history", label: "Gas Billing History" },
       ]}
     >
-      <section id="account" className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 className="font-semibold">Account</h2>
-        <p className="mt-2 text-sm text-zinc-600">
-          <Link href="/register" className="font-medium text-zinc-900 underline underline-offset-2">
-            Create an account
-          </Link>
-          {" · "}
-          <Link href="/login" className="font-medium text-zinc-900 underline underline-offset-2">
-            Sign in
-          </Link>
+      {err ? (
+        <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-200">
+          {err}
+        </section>
+      ) : null}
+      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="font-semibold">Resident Overview</h2>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+          Use the Profile page to view your account details and Gas Billing History
+          page to review your billing records.
         </p>
-      </section>
-      <section id="history" className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 className="font-semibold">My Billing History</h2>
-        <p className="mt-2 text-sm text-zinc-600">
-          Placeholder for personal bill history list and details.
-        </p>
+        <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">
+          Current {unitName} Price: <span className="font-semibold">{unitPrice.toFixed(2)}</span>
+        </div>
       </section>
     </AppShell>
   );

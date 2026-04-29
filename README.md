@@ -12,6 +12,7 @@ LPG Reticulation Billing System scaffold with role-based architecture.
 ## Workspace
 
 - `apps/web`: Next.js role portals and UI scaffold
+- `apps/mobile`: Expo (React Native) companion app (login, unit price, billing history)
 - `apps/api`: NestJS API modules (auth/admin/billing/management)
 - `packages/shared`: shared role and billing types
 
@@ -35,12 +36,14 @@ Implemented in `apps/api/src/billing/billing.service.ts`:
 npm install
 npm run dev:api
 npm run dev:web
+npm run dev:mobile
 ```
 
 ## Environment
 
 - API env template: `apps/api/.env.example`
 - Web env template: `apps/web/.env.example`
+- Mobile env template: `apps/mobile/.env.example` (`EXPO_PUBLIC_API_BASE_URL`; use your computer’s LAN IP or `10.0.2.2` on the Android emulator)
 
 ## Database
 

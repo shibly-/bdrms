@@ -56,6 +56,12 @@ export class BillingController {
     });
   }
 
+  @Get('unit-config')
+  @Roles(UserRole.Admin, UserRole.Staff, UserRole.User)
+  getUnitConfig() {
+    return this.billingService.getCurrentUnitConfig();
+  }
+
   @Get('monthly')
   @Roles(UserRole.Admin, UserRole.Staff)
   async getMonthly(@Query('month') month?: string) {
@@ -70,17 +76,21 @@ export class BillingController {
   }
 
   @Get('history')
-  @Roles(UserRole.Admin, UserRole.Staff)
+  @Roles(UserRole.Admin, UserRole.Staff, UserRole.User)
   getHistory(
+    @Req()
+    req: { user?: { role?: UserRole; userName?: string } },
     @Query('month') month?: string,
     @Query('userName') userName?: string,
     @Query('gasMeterNo') gasMeterNo?: string,
     @Query('buildingId') buildingId?: string,
     @Query('flatId') flatId?: string,
   ) {
+    const isResident = req.user?.role === UserRole.User;
+    const scopedUserName = isResident ? req.user?.userName : userName;
     return this.billingService.listBillingHistory({
       month,
-      userName,
+      userName: scopedUserName,
       gasMeterNo,
       buildingId: buildingId ? Number(buildingId) : undefined,
       flatId: flatId ? Number(flatId) : undefined,

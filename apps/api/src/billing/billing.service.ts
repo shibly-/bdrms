@@ -174,6 +174,26 @@ export class BillingService {
     };
   }
 
+  async getCurrentUnitConfig() {
+    const [config] = await this.db
+      .select({
+        gasUnitName: schema.systemConfigs.gasUnitName,
+        gasUnitPrice: schema.systemConfigs.gasUnitPrice,
+      })
+      .from(schema.systemConfigs)
+      .orderBy(desc(schema.systemConfigs.id))
+      .limit(1);
+
+    if (!config) {
+      return { gasUnitName: 'Gas Unit', gasUnitPrice: 0 };
+    }
+
+    return {
+      gasUnitName: config.gasUnitName,
+      gasUnitPrice: Number(config.gasUnitPrice),
+    };
+  }
+
   async listBillingHistory(filters: BillingHistoryFilters) {
     const conditions = [];
     if (filters.month && /^\d{4}-\d{2}$/.test(filters.month)) {

@@ -10,6 +10,7 @@
   "scripts": {
     "dev:web": "npm run dev -w web",
     "dev:api": "npm run start:dev -w api",
+    "dev:mobile": "npm run start -w mobile",
     "build": "npm run build -w web && npm run build -w api",
     "lint": "npm run lint -w web && npm run lint -w api"
   },
