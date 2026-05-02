@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Tesseract from "tesseract.js";
 import { AppShell } from "@/components/app-shell";
 import { adminFetch } from "@/lib/admin-client";
+import { compressMeterImageToDataUrl } from "@/lib/meter-image";
 
 type Building = { id: number; name: string; buildingNo: string | null };
 type Flat = { id: number; flatNo: string; buildingId: number };
@@ -31,7 +32,8 @@ export default function GasBillingFormPage() {
   const [ctx, setCtx] = useState<FlatContext | null>(null);
   const [readingDate, setReadingDate] = useState(new Date().toISOString().slice(0, 10));
   const [currentReading, setCurrentReading] = useState<string>("");
-  const [scanImageUrl, setScanImageUrl] = useState<string>("");
+  /** JPEG data URL persisted with the bill; also used for preview */
+  const [meterImageDataUrl, setMeterImageDataUrl] = useState<string>("");
   const [scanBusy, setScanBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -48,6 +50,7 @@ export default function GasBillingFormPage() {
     setCtx(null);
     setCurrentReading("");
     setFlatId("");
+    setMeterImageDataUrl("");
     if (!buildingId) {
       setFlats([]);
       return;
@@ -60,6 +63,7 @@ export default function GasBillingFormPage() {
   }, [buildingId]);
 
   useEffect(() => {
+    setMeterImageDataUrl("");
     if (!flatId) return;
     void adminFetch<FlatContext>(`/billing/flat-context?flatId=${flatId}`)
       .then((data) => {
@@ -83,8 +87,8 @@ export default function GasBillingFormPage() {
     setErr("");
     setMsg("");
     try {
-      const imageUrl = URL.createObjectURL(file);
-      setScanImageUrl(imageUrl);
+      const dataUrl = await compressMeterImageToDataUrl(file);
+      setMeterImageDataUrl(dataUrl);
       const result = await Tesseract.recognize(file, "eng");
       const text = result.data.text ?? "";
       const matches = text.match(/\d+(?:\.\d+)?/g);
@@ -113,11 +117,12 @@ export default function GasBillingFormPage() {
           flatId,
           billingDate: readingDate,
           currentReading: currentNumeric,
-          ocrImageUrl: scanImageUrl || undefined,
+          ocrImageUrl: meterImageDataUrl || undefined,
         }),
       });
       setMsg(`Gas bill created successfully. Bill ID: ${created.billId}`);
       setCurrentReading("");
+      setMeterImageDataUrl("");
       const refreshed = await adminFetch<FlatContext>(`/billing/flat-context?flatId=${flatId}`);
       setCtx(refreshed);
     } catch (error) {
@@ -204,9 +209,11 @@ export default function GasBillingFormPage() {
                 if (file) void scanFromImage(file);
               }}
             />
-            <span className="mt-1 block text-xs text-zinc-500">Captured image is scanned and meter digits are populated to Current Reading.</span>
-            {scanImageUrl ? (
-              <img src={scanImageUrl} alt="Captured gas meter" className="mt-2 h-28 rounded-md border border-zinc-300 object-cover" />
+            <span className="mt-1 block text-xs text-zinc-500">
+              Captured image is scanned to fill Current Reading. The same image is stored with the bill for future reference (billing history).
+            </span>
+            {meterImageDataUrl ? (
+              <img src={meterImageDataUrl} alt="Captured gas meter" className="mt-2 h-28 max-w-full rounded-md border border-zinc-300 object-contain" />
             ) : null}
             {scanBusy ? <span className="mt-1 block text-xs">Scanning image and reading meter digits...</span> : null}
           </label>

@@ -2,22 +2,14 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { BillingMeterImageCell } from "@/components/billing-meter-image-cell";
+import {
+  GasBillDetailModal,
+  type GasBillDetailRow,
+} from "@/components/gas-bill-detail-modal";
 import { adminFetch } from "@/lib/admin-client";
 
-type BillingRow = {
-  billId: number;
-  billingDate: string;
-  userName: string;
-  fullName: string;
-  gasMeterNo: string;
-  buildingName: string;
-  flatNo: string;
-  previousReading: string;
-  currentReading: string;
-  usageQuantity: string;
-  unitPrice: string;
-  totalBill: string;
-};
+type BillingRow = GasBillDetailRow;
 type Building = { id: number; name: string; buildingNo: string | null };
 type Flat = { id: number; flatNo: string; buildingId: number };
 
@@ -35,6 +27,7 @@ export default function GasBillingHistoryPage() {
   const [err, setErr] = useState("");
   const [sortKey, setSortKey] = useState<"billingDate" | "userName" | "gasMeterNo" | "totalBill">("billingDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [detailBill, setDetailBill] = useState<BillingRow | null>(null);
 
   useEffect(() => {
     void adminFetch<Building[]>("/admin/buildings")
@@ -156,6 +149,8 @@ export default function GasBillingHistoryPage() {
                 <th>Usage (m³)</th>
                 <th>Unit Price</th>
                 <th><button onClick={() => toggleSort("totalBill")} className="font-semibold">Total Bill</button></th>
+                <th>Meter image</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -171,17 +166,31 @@ export default function GasBillingHistoryPage() {
                   <td>{r.usageQuantity}</td>
                   <td>{r.unitPrice}</td>
                   <td>{r.totalBill}</td>
+                  <td className="align-middle">
+                    <BillingMeterImageCell src={r.ocrImageUrl} />
+                  </td>
+                  <td className="align-middle">
+                    <button
+                      type="button"
+                      onClick={() => setDetailBill(r)}
+                      className="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+                    >
+                      Details
+                    </button>
+                  </td>
                 </tr>
               ))}
               {sortedRows.length === 0 ? (
                 <tr>
-                  <td className="py-3 text-zinc-500" colSpan={10}>No billing rows found.</td>
+                  <td className="py-3 text-zinc-500" colSpan={12}>No billing rows found.</td>
                 </tr>
               ) : null}
             </tbody>
           </table>
         </div>
       </section>
+
+      <GasBillDetailModal bill={detailBill} onClose={() => setDetailBill(null)} />
     </AppShell>
   );
 }

@@ -4,6 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Flame, Home } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import {
+  AUTH_LANDING_PATH,
+  clearAuthStorage,
+  isAccessTokenExpired,
+} from "@/lib/auth-session";
 
 type MenuItem = {
   href: string;
@@ -22,11 +27,12 @@ export function AppShell({ title, subtitle, menu, children }: AppShellProps) {
   const router = useRouter();
   const [role, setRole] = useState<string>("");
   const [token, setToken] = useState<string>("");
+  const [portalReady, setPortalReady] = useState(false);
 
-  useEffect(() => {
-    setRole(window.localStorage.getItem("userRole") ?? "");
-    setToken(window.localStorage.getItem("accessToken") ?? "");
-  }, []);
+  const menuHrefKey = useMemo(
+    () => menu.map((item) => item.href).join("\0"),
+    [menu],
+  );
 
   const hasAdminMenus = useMemo(
     () => menu.some((item) => item.href.startsWith("/admin")),
@@ -36,23 +42,69 @@ export function AppShell({ title, subtitle, menu, children }: AppShellProps) {
     () => menu.some((item) => item.href.startsWith("/staff")),
     [menu],
   );
+  const hasUserMenus = useMemo(
+    () => menu.some((item) => item.href.startsWith("/user")),
+    [menu],
+  );
   const isAdminContext = pathname.startsWith("/admin") || hasAdminMenus;
   const isStaffContext = pathname.startsWith("/staff") || hasStaffMenus;
-  const isAdminLoggedIn = role === "admin" && token.length > 0;
-  const isStaffLoggedIn = role === "staff" && token.length > 0;
-  const isLoggedIn = token.length > 0;
-  const blockedByRole =
-    (isAdminContext && !isAdminLoggedIn) ||
-    (isStaffContext && !isStaffLoggedIn);
-  const showSidebar = !blockedByRole;
-  const visibleMenu = blockedByRole ? [] : menu;
+  const isUserContext = pathname.startsWith("/user") || hasUserMenus;
+  const isLoggedIn = token.length > 0 && !isAccessTokenExpired(token);
+
+  useEffect(() => {
+    const r = window.localStorage.getItem("userRole") ?? "";
+    const t = window.localStorage.getItem("accessToken") ?? "";
+    setRole(r);
+    setToken(t);
+
+    const expired = t.length > 0 && isAccessTokenExpired(t);
+    if (expired) {
+      setPortalReady(false);
+      clearAuthStorage();
+      setRole("");
+      setToken("");
+      router.replace(AUTH_LANDING_PATH);
+      return;
+    }
+
+    const sessionValid = t.length > 0 && !isAccessTokenExpired(t);
+    const allowed =
+      (isAdminContext && r === "admin" && sessionValid) ||
+      (isStaffContext && r === "staff" && sessionValid) ||
+      (isUserContext && r === "user" && sessionValid);
+
+    if (!allowed) {
+      setPortalReady(false);
+      if (!t) clearAuthStorage();
+      router.replace(AUTH_LANDING_PATH);
+      return;
+    }
+
+    setPortalReady(true);
+  }, [
+    pathname,
+    menuHrefKey,
+    router,
+    isAdminContext,
+    isStaffContext,
+    isUserContext,
+  ]);
+
+  const showSidebar = portalReady;
+  const visibleMenu = menu;
 
   function handleLogout() {
-    window.localStorage.removeItem("accessToken");
-    window.localStorage.removeItem("userRole");
+    clearAuthStorage();
     setToken("");
     setRole("");
-    router.push("/login");
+    setPortalReady(false);
+    router.push(AUTH_LANDING_PATH);
+  }
+
+  if (!portalReady) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950" aria-busy="true" />
+    );
   }
 
   return (

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, ReceiptText, UserCog } from "lucide-react";
+import { BookOpen, Building2, ReceiptText, UserCog } from "lucide-react";
 
 export default function Home() {
   return (
@@ -46,6 +46,30 @@ export default function Home() {
           <p className="mt-2 text-sm text-zinc-600">
             Register, sign in, and check your billing history.
           </p>
+        </Link>
+      </section>
+
+      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <Link
+          href="/docs"
+          className="group flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-3">
+            <span className="rounded-lg bg-zinc-900 p-2 text-white dark:bg-zinc-100 dark:text-zinc-900">
+              <BookOpen className="h-5 w-5" aria-hidden />
+            </span>
+            <div>
+              <h2 className="font-semibold text-zinc-900 group-hover:underline dark:text-zinc-50">
+                Documentation
+              </h2>
+              <p className="mt-1 max-w-xl text-sm text-zinc-600 dark:text-zinc-300">
+                Technical stack, architecture and billing flow diagrams, setup instructions, and Git repository links.
+              </p>
+            </div>
+          </div>
+          <span className="text-sm font-medium text-zinc-700 group-hover:underline dark:text-zinc-200">
+            View docs →
+          </span>
         </Link>
       </section>
 

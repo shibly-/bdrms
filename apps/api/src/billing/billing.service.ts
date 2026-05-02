@@ -19,6 +19,8 @@ type BillingHistoryFilters = {
   flatId?: number;
 };
 
+const MAX_OCR_IMAGE_STORED_CHARS = 6 * 1024 * 1024;
+
 type CreateGasBillInput = {
   flatId: number;
   currentReading: number;
@@ -135,6 +137,12 @@ export class BillingService {
   }
 
   async createGasBill(input: CreateGasBillInput) {
+    if (
+      input.ocrImageUrl != null &&
+      input.ocrImageUrl.length > MAX_OCR_IMAGE_STORED_CHARS
+    ) {
+      throw new BadRequestException('Meter image payload is too large');
+    }
     const context = await this.getFlatBillingContext(input.flatId);
     if (!Number.isFinite(input.currentReading) || input.currentReading < 0) {
       throw new BadRequestException('currentReading must be a non-negative number');
@@ -232,6 +240,7 @@ export class BillingService {
         usageQuantity: schema.bills.usageQuantity,
         unitPrice: schema.bills.unitPrice,
         totalBill: schema.bills.totalBill,
+        ocrImageUrl: schema.bills.ocrImageUrl,
         userName: schema.users.userName,
         fullName: schema.users.fullName,
         gasMeterNo: schema.standardUserProfiles.gasMeterNo,
