@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -182,6 +183,77 @@ export class AuthService {
       accessToken,
       role: newUser.role,
       userId: newUser.id,
+    };
+  }
+
+  async getResidentProfile(userId: number) {
+    if (!Number.isFinite(userId) || userId < 1) {
+      throw new NotFoundException('User not found');
+    }
+
+    const [user] = await this.db
+      .select({
+        id: schema.users.id,
+        userName: schema.users.userName,
+        fullName: schema.users.fullName,
+        phone: schema.users.phone,
+        email: schema.users.email,
+        role: schema.users.role,
+        isActive: schema.users.isActive,
+        createdAt: schema.users.createdAt,
+      })
+      .from(schema.users)
+      .where(
+        and(eq(schema.users.id, userId), eq(schema.users.role, UserRole.User)),
+      )
+      .limit(1);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const [prof] = await this.db
+      .select({
+        profileId: schema.standardUserProfiles.id,
+        buildingId: schema.standardUserProfiles.buildingId,
+        flatId: schema.standardUserProfiles.flatId,
+        gasMeterNo: schema.standardUserProfiles.gasMeterNo,
+        installationDate: schema.standardUserProfiles.installationDate,
+        activationDate: schema.standardUserProfiles.activationDate,
+      })
+      .from(schema.standardUserProfiles)
+      .where(eq(schema.standardUserProfiles.userId, userId))
+      .limit(1);
+
+    if (!prof) {
+      return { user, profile: null };
+    }
+
+    const [building] = await this.db
+      .select({
+        name: schema.buildings.name,
+        buildingNo: schema.buildings.buildingNo,
+        address1: schema.buildings.address1,
+        address2: schema.buildings.address2,
+        postCode: schema.buildings.postCode,
+      })
+      .from(schema.buildings)
+      .where(eq(schema.buildings.id, prof.buildingId))
+      .limit(1);
+
+    const [flat] = await this.db
+      .select({ flatNo: schema.flats.flatNo })
+      .from(schema.flats)
+      .where(eq(schema.flats.id, prof.flatId))
+      .limit(1);
+
+    return {
+      user,
+      profile: {
+        ...prof,
+        building: building ?? null,
+        flatNo: flat?.flatNo ?? null,
+      },
     };
   }
 

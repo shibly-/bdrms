@@ -5,12 +5,30 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Req,
+  UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
+import { UserRole } from '../common/types';
 import { AuthService, type RegisterStandardUserDto } from './auth.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { Roles } from './roles.decorator';
+import { RolesGuard } from './roles.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.User)
+  me(@Req() req: { user?: { sub?: number } }) {
+    const userId = req.user?.sub;
+    if (userId == null || !Number.isFinite(userId)) {
+      throw new UnauthorizedException('Invalid session');
+    }
+    return this.authService.getResidentProfile(userId);
+  }
 
   @Get('buildings')
   listBuildings() {
