@@ -2,12 +2,15 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { useUserRole } from "@/hooks/use-user-role";
 import { adminFetch } from "@/lib/admin-client";
+import { getAdminNavForRole } from "@/lib/admin-nav";
 
 type Building = { id: number; name: string };
 type Flat = { id: number; flatNo: string; buildingId: number; buildingName: string };
 
 export default function FlatsPage() {
+  const role = useUserRole();
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [flats, setFlats] = useState<Flat[]>([]);
   const [activeTab, setActiveTab] = useState<"list" | "form">("list");
@@ -123,16 +126,7 @@ export default function FlatsPage() {
     <AppShell
       title="Flat/Apartment Management"
       subtitle="Only admin can create and manage flats/apartments."
-      menu={[
-        { href: "/admin", label: "Overview" },
-        { href: "/admin/buildings", label: "Buildings" },
-        { href: "/admin/flats", label: "Flats/Apartments" },
-        { href: "/admin/users", label: "Standard Users" },
-        { href: "/admin/staff", label: "Staff Users" },
-        { href: "/admin/gas-billing-form", label: "Gas Billing Form" },
-        { href: "/admin/gas-billing-history", label: "Gas Billing History" },
-        { href: "/admin/config", label: "Configuration" },
-      ]}
+      menu={getAdminNavForRole(role)}
     >
       {err ? (
         <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-200">

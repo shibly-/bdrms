@@ -68,8 +68,9 @@ export function AppShell({ title, subtitle, menu, children }: AppShellProps) {
     }
 
     const sessionValid = t.length > 0 && !isAccessTokenExpired(t);
+    const isAdminPortalRole = r === "admin" || r === "building_admin";
     const allowed =
-      (isAdminContext && r === "admin" && sessionValid) ||
+      (isAdminContext && isAdminPortalRole && sessionValid) ||
       (isStaffContext && r === "staff" && sessionValid) ||
       (isUserContext && r === "user" && sessionValid);
 

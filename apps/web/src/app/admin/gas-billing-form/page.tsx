@@ -3,7 +3,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Tesseract from "tesseract.js";
 import { AppShell } from "@/components/app-shell";
+import { useUserRole } from "@/hooks/use-user-role";
 import { adminFetch } from "@/lib/admin-client";
+import { getAdminNavForRole } from "@/lib/admin-nav";
 import { compressMeterImageToDataUrl } from "@/lib/meter-image";
 
 type Building = { id: number; name: string; buildingNo: string | null };
@@ -22,9 +24,11 @@ type FlatContext = {
   gasMeterNo: string;
   previousReading: number;
   unitPrice: number;
+  operatingCostPerFlat: number;
 };
 
 export default function GasBillingFormPage() {
+  const role = useUserRole();
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [flats, setFlats] = useState<Flat[]>([]);
   const [buildingId, setBuildingId] = useState<number | "">("");
@@ -77,10 +81,11 @@ export default function GasBillingFormPage() {
 
   const previousReading = ctx?.previousReading ?? 0;
   const unitPrice = ctx?.unitPrice ?? 0;
+  const operatingCostPerFlat = ctx?.operatingCostPerFlat ?? 0;
   const currentNumeric = Number(currentReading || "0");
   const usageQuantity = useMemo(() => Math.max(0, currentNumeric - previousReading), [currentNumeric, previousReading]);
   const usageQuantityKg = useMemo(() => usageQuantity * 1.8315, [usageQuantity]);
-  const totalBill = useMemo(() => usageQuantityKg * unitPrice, [usageQuantityKg, unitPrice]);
+  const totalBill = useMemo(() => usageQuantityKg * unitPrice + operatingCostPerFlat, [usageQuantityKg, unitPrice, operatingCostPerFlat]);
 
   async function scanFromImage(file: File) {
     setScanBusy(true);
@@ -131,16 +136,11 @@ export default function GasBillingFormPage() {
   }
 
   return (
-    <AppShell title="Gas Billing Form" subtitle="Generate gas bills with scanner-assisted current reading." menu={[
-      { href: "/admin", label: "Overview" },
-      { href: "/admin/buildings", label: "Buildings" },
-      { href: "/admin/flats", label: "Flats/Apartments" },
-      { href: "/admin/users", label: "Standard Users" },
-      { href: "/admin/staff", label: "Staff Users" },
-      { href: "/admin/gas-billing-form", label: "Gas Billing Form" },
-      { href: "/admin/gas-billing-history", label: "Gas Billing History" },
-      { href: "/admin/config", label: "Configuration" },
-    ]}>
+    <AppShell
+      title="Gas Billing Form"
+      subtitle="Generate gas bills with scanner-assisted current reading."
+      menu={getAdminNavForRole(role)}
+    >
       {err ? (
         <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-200">
           {err}
@@ -195,6 +195,7 @@ export default function GasBillingFormPage() {
           </label>
           <label className="text-sm text-zinc-700 dark:text-zinc-300">Usage Quantity (m³)<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={usageQuantity.toFixed(3)} readOnly /></label>
           <label className="text-sm text-zinc-700 dark:text-zinc-300">Usage Quantity (kg)<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={usageQuantityKg.toFixed(3)} readOnly /></label>
+          <label className="text-sm text-zinc-700 dark:text-zinc-300">Operating Cost Per Flat<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={operatingCostPerFlat.toFixed(2)} readOnly /></label>
           <label className="text-sm text-zinc-700 dark:text-zinc-300">Total Bill<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={totalBill.toFixed(2)} readOnly /></label>
 
           <label className="md:col-span-2 rounded-md border border-zinc-300 p-3 text-sm text-zinc-700 dark:border-zinc-700 dark:text-zinc-300">

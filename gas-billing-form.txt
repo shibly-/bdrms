@@ -1,0 +1,5 @@
+The project should have a feature called Billing Management which includes: 
+- 
+
+
+Add one page named as "Gas Billing Form" before Configuration. "Gas Billing Form" will have following attributes: Building No, Flat No, User Name, Full Name, Phone No, Email, Gas Meter No, Gas Meter Reading Date, Previous Reading, Current Reading, Usage Quantity, Total Bill. This form must have an image scanner integrated which can capture and scan an image to read Gas Meter as Current Reading. "Current Reading" will be populated from this scanned meter digits. "Current Reading" is editable. Building No is a drop-down. Once the Building No is selected, Flat No drop-down will populate. If the Flat No is selected, then respective User Name, Full Name, Phone No, Email, Gas Meter No will populated from database for this Flat No. Gas Meter Reading Date will auto populate as current date. If there is no "Previous Reading" value, then "Previous Reading" will 0. "Usage Quantity" which is a differnce between "Current Reading" & "Previous Reading".  "Total Bill" which is a multiplication of Usage Quantity & Gas Unit Price (from configuration page). 

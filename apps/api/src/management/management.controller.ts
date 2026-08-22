@@ -1,5 +1,8 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
-import { UserRole } from '../common/types';
+import {
+  ADMIN_PORTAL_ROLES,
+  ADMIN_STAFF_ROLES,
+} from '../common/admin-roles';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -23,20 +26,20 @@ const flats = [
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ManagementController {
   @Get('buildings')
-  @Roles(UserRole.Admin, UserRole.Staff)
+  @Roles(...ADMIN_STAFF_ROLES)
   getBuildings() {
     return buildings;
   }
 
   @Get('buildings/:id/flats')
-  @Roles(UserRole.Admin, UserRole.Staff)
+  @Roles(...ADMIN_STAFF_ROLES)
   getBuildingFlats(@Param('id') id: string) {
     const buildingId = Number(id);
     return flats.filter((item) => item.buildingId === buildingId);
   }
 
   @Get('buildings/:id/address')
-  @Roles(UserRole.Admin)
+  @Roles(...ADMIN_PORTAL_ROLES)
   getBuildingAddress(@Param('id') id: string) {
     return buildings.find((item) => item.id === Number(id)) ?? null;
   }

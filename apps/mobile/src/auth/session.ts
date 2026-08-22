@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 
 const KEY = 'bdrms_auth_session';
 
-export type UserRole = 'admin' | 'staff' | 'user';
+export type UserRole = 'admin' | 'building_admin' | 'staff' | 'user';
 
 export type AuthSession = {
   accessToken: string;

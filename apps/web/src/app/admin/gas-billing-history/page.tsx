@@ -7,13 +7,16 @@ import {
   GasBillDetailModal,
   type GasBillDetailRow,
 } from "@/components/gas-bill-detail-modal";
+import { useUserRole } from "@/hooks/use-user-role";
 import { adminFetch } from "@/lib/admin-client";
+import { getAdminNavForRole } from "@/lib/admin-nav";
 
 type BillingRow = GasBillDetailRow;
 type Building = { id: number; name: string; buildingNo: string | null };
 type Flat = { id: number; flatNo: string; buildingId: number };
 
 export default function GasBillingHistoryPage() {
+  const role = useUserRole();
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [flats, setFlats] = useState<Flat[]>([]);
   const [filters, setFilters] = useState({
@@ -82,16 +85,7 @@ export default function GasBillingHistoryPage() {
     <AppShell
       title="Gas Billing History"
       subtitle="Admin view of generated gas bills with search filters."
-      menu={[
-        { href: "/admin", label: "Overview" },
-        { href: "/admin/buildings", label: "Buildings" },
-        { href: "/admin/flats", label: "Flats/Apartments" },
-        { href: "/admin/users", label: "Standard Users" },
-        { href: "/admin/staff", label: "Staff Users" },
-        { href: "/admin/gas-billing-form", label: "Gas Billing Form" },
-        { href: "/admin/gas-billing-history", label: "Gas Billing History" },
-        { href: "/admin/config", label: "Configuration" },
-      ]}
+      menu={getAdminNavForRole(role)}
     >
       {err ? (
         <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-200">

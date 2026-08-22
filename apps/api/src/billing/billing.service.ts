@@ -9,6 +9,7 @@ export type GenerateBillInput = {
   previousReading?: number | null;
   currentReading: number;
   unitPrice: number;
+  operatingCostPerFlat?: number | null;
 };
 
 type BillingHistoryFilters = {
@@ -37,15 +38,17 @@ export class BillingService {
 
   calculate(input: GenerateBillInput): BillingPreview {
     const previous = input.previousReading ?? 0;
+    const operatingCostPerFlat = input.operatingCostPerFlat ?? 0;
     const usage = Math.max(0, input.currentReading - previous);
     const usageKg = usage * 1.8315;
-    const total = usageKg * input.unitPrice;
+    const total = usageKg * input.unitPrice + operatingCostPerFlat;
 
     return {
       previousReading: previous,
       currentReading: input.currentReading,
       usageQuantity: Number(usage.toFixed(3)),
       unitPrice: Number(input.unitPrice.toFixed(2)),
+      operatingCostPerFlat: Number(operatingCostPerFlat.toFixed(2)),
       totalBill: Number(total.toFixed(2)),
     };
   }
@@ -112,6 +115,7 @@ export class BillingService {
     const [config] = await this.db
       .select({
         gasUnitPrice: schema.systemConfigs.gasUnitPrice,
+        operatingCostPerFlat: schema.systemConfigs.operatingCostPerFlat,
       })
       .from(schema.systemConfigs)
       .orderBy(desc(schema.systemConfigs.id))
@@ -133,6 +137,9 @@ export class BillingService {
         ? Number(latestBill.currentReading)
         : 0,
       unitPrice: config?.gasUnitPrice ? Number(config.gasUnitPrice) : 0,
+      operatingCostPerFlat: config?.operatingCostPerFlat
+        ? Number(config.operatingCostPerFlat)
+        : 0,
     };
   }
 
@@ -154,6 +161,7 @@ export class BillingService {
       previousReading: context.previousReading,
       currentReading: input.currentReading,
       unitPrice: context.unitPrice,
+      operatingCostPerFlat: context.operatingCostPerFlat,
     });
 
     const [created] = await this.db
@@ -187,18 +195,24 @@ export class BillingService {
       .select({
         gasUnitName: schema.systemConfigs.gasUnitName,
         gasUnitPrice: schema.systemConfigs.gasUnitPrice,
+        operatingCostPerFlat: schema.systemConfigs.operatingCostPerFlat
       })
       .from(schema.systemConfigs)
       .orderBy(desc(schema.systemConfigs.id))
       .limit(1);
 
     if (!config) {
-      return { gasUnitName: 'Gas Unit', gasUnitPrice: 0 };
+      return {
+        gasUnitName: 'Gas Unit',
+        gasUnitPrice: 0,
+        operatingCostPerFlat: 0,
+      };
     }
 
     return {
       gasUnitName: config.gasUnitName,
       gasUnitPrice: Number(config.gasUnitPrice),
+      operatingCostPerFlat: Number(config.operatingCostPerFlat),
     };
   }
 

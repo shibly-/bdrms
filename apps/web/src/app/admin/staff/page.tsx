@@ -2,11 +2,14 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { useUserRole } from "@/hooks/use-user-role";
 import { adminFetch } from "@/lib/admin-client";
+import { getAdminNavForRole } from "@/lib/admin-nav";
 
 type StaffRow = { id: number; userName: string; fullName: string; profile?: { operationArea?: string | null } | null };
 
 export default function StaffPage() {
+  const role = useUserRole();
   const [rows, setRows] = useState<StaffRow[]>([]);
   const [activeTab, setActiveTab] = useState<"list" | "form">("list");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -105,10 +108,11 @@ export default function StaffPage() {
   });
 
   return (
-    <AppShell title="Staff User Management" subtitle="Only admin can create and manage staff users." menu={[
-      { href: "/admin", label: "Overview" }, { href: "/admin/buildings", label: "Buildings" }, { href: "/admin/flats", label: "Flats/Apartments" },
-      { href: "/admin/users", label: "Standard Users" }, { href: "/admin/staff", label: "Staff Users" }, { href: "/admin/gas-billing-form", label: "Gas Billing Form" }, { href: "/admin/gas-billing-history", label: "Gas Billing History" }, { href: "/admin/config", label: "Configuration" },
-    ]}>
+    <AppShell
+      title="Staff User Management"
+      subtitle="Only admin can create and manage staff users."
+      menu={getAdminNavForRole(role)}
+    >
       {err ? <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{err}</section> : null}
       {msg ? <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{msg}</section> : null}
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">

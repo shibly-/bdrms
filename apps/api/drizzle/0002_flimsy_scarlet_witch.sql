@@ -1,0 +1,1 @@
+ALTER TABLE "system_configs" ADD COLUMN "operating_cost_per_flat" numeric(12, 2) DEFAULT '1' NOT NULL;

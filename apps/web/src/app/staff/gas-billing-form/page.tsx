@@ -22,6 +22,7 @@ type FlatContext = {
   gasMeterNo: string;
   previousReading: number;
   unitPrice: number;
+  operatingCostPerFlat: number;
 };
 
 export default function StaffGasBillingFormPage() {
@@ -70,10 +71,11 @@ export default function StaffGasBillingFormPage() {
 
   const previousReading = ctx?.previousReading ?? 0;
   const unitPrice = ctx?.unitPrice ?? 0;
+  const operatingCostPerFlat = ctx?.operatingCostPerFlat ?? 0;
   const currentNumeric = Number(currentReading || "0");
   const usageQuantity = useMemo(() => Math.max(0, currentNumeric - previousReading), [currentNumeric, previousReading]);
   const usageQuantityKg = useMemo(() => usageQuantity * 1.8315, [usageQuantity]);
-  const totalBill = useMemo(() => usageQuantityKg * unitPrice, [usageQuantityKg, unitPrice]);
+  const totalBill = useMemo(() => usageQuantityKg * unitPrice + operatingCostPerFlat, [usageQuantityKg, unitPrice, operatingCostPerFlat]);
 
   async function scanFromImage(file: File) {
     setScanBusy(true);
@@ -161,6 +163,7 @@ export default function StaffGasBillingFormPage() {
           <label className="text-sm text-zinc-700">Current Reading (m³)<input type="number" step="0.001" min="0" className="mt-1 w-full rounded-md border border-zinc-300 p-2" value={currentReading} onChange={(e) => setCurrentReading(e.target.value)} required /></label>
           <label className="text-sm text-zinc-700">Usage Quantity (m³)<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={usageQuantity.toFixed(3)} readOnly /></label>
           <label className="text-sm text-zinc-700">Usage Quantity (kg)<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={usageQuantityKg.toFixed(3)} readOnly /></label>
+          <label className="text-sm text-zinc-700">Operating Cost Per Flat<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={operatingCostPerFlat.toFixed(2)} readOnly /></label>
           <label className="text-sm text-zinc-700">Total Bill<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={totalBill.toFixed(2)} readOnly /></label>
           <label className="md:col-span-2 rounded-md border border-zinc-300 p-3 text-sm text-zinc-700">
             Capture Meter Image (Camera) / Upload Image

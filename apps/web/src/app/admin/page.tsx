@@ -5,6 +5,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { Building2, Home, LineChart, ReceiptText, Settings, UserRound, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { adminFetch, getAccessToken } from "@/lib/admin-client";
+import { getAdminNavForRole } from "@/lib/admin-nav";
 
 type DashboardStats = {
   users: number;
@@ -29,7 +30,9 @@ export default function AdminPage() {
     setToken(getAccessToken());
     setRole(window.localStorage.getItem("userRole") ?? "");
   }, []);
-  const isAdminLoggedIn = token.length > 0 && role === "admin";
+  const isAdminLoggedIn =
+    token.length > 0 && (role === "admin" || role === "building_admin");
+  const isBuildingAdmin = role === "building_admin";
   useEffect(() => {
     if (!isAdminLoggedIn) return;
     void adminFetch<DashboardStats>("/admin/dashboard-stats").then(setStats).catch(() => {});
@@ -38,17 +41,12 @@ export default function AdminPage() {
   return (
     <AppShell
       title="Admin Dashboard"
-      subtitle="Use dedicated pages to manage buildings, flats, users, staff, configuration, and billing history."
-      menu={[
-        { href: "/admin", label: "Overview" },
-        { href: "/admin/buildings", label: "Buildings" },
-        { href: "/admin/flats", label: "Flats/Apartments" },
-        { href: "/admin/users", label: "Standard Users" },
-        { href: "/admin/staff", label: "Staff Users" },
-        { href: "/admin/gas-billing-form", label: "Gas Billing Form" },
-        { href: "/admin/gas-billing-history", label: "Gas Billing History" },
-        { href: "/admin/config", label: "Configuration" },
-      ]}
+      subtitle={
+        isBuildingAdmin
+          ? "Manage flats, users, staff, and billing. Building registry and system configuration are managed by a system administrator."
+          : "Use dedicated pages to manage buildings, flats, users, staff, configuration, and billing history."
+      }
+      menu={getAdminNavForRole(role)}
     >
       {!isAdminLoggedIn ? (
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-200">
@@ -57,10 +55,14 @@ export default function AdminPage() {
       ) : null}
 
       {isAdminLoggedIn ? (
-        <section className="grid gap-4 md:grid-cols-4">
+        <section
+          className={`grid gap-4 ${isBuildingAdmin ? "md:grid-cols-3" : "md:grid-cols-4"}`}
+        >
           <StatCard label="Users" value={stats.users} icon={<UserRound className="h-4 w-4" />} />
           <StatCard label="Staff" value={stats.staff} icon={<Users className="h-4 w-4" />} />
-          <StatCard label="Buildings" value={stats.buildings} icon={<Building2 className="h-4 w-4" />} />
+          {isBuildingAdmin ? null : (
+            <StatCard label="Buildings" value={stats.buildings} icon={<Building2 className="h-4 w-4" />} />
+          )}
           <StatCard label="Flat/Apartments" value={stats.flats} icon={<Home className="h-4 w-4" />} />
         </section>
       ) : null}
@@ -76,13 +78,17 @@ export default function AdminPage() {
 
       {isAdminLoggedIn ? (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <QuickLink href="/admin/buildings" icon={<Home className="h-4 w-4" />} title="Building Management" />
+          {isBuildingAdmin ? null : (
+            <QuickLink href="/admin/buildings" icon={<Home className="h-4 w-4" />} title="Building Management" />
+          )}
           <QuickLink href="/admin/flats" icon={<Building2 className="h-4 w-4" />} title="Flat/Apartment Management" />
           <QuickLink href="/admin/users" icon={<UserRound className="h-4 w-4" />} title="Standard User Management" />
           <QuickLink href="/admin/staff" icon={<Users className="h-4 w-4" />} title="Staff User Management" />
           <QuickLink href="/admin/gas-billing-form" icon={<ReceiptText className="h-4 w-4" />} title="Gas Billing Form" />
           <QuickLink href="/admin/gas-billing-history" icon={<ReceiptText className="h-4 w-4" />} title="Gas Billing History" />
-          <QuickLink href="/admin/config" icon={<Settings className="h-4 w-4" />} title="Configuration Page" />
+          {isBuildingAdmin ? null : (
+            <QuickLink href="/admin/config" icon={<Settings className="h-4 w-4" />} title="Configuration Page" />
+          )}
         </section>
       ) : null}
     </AppShell>

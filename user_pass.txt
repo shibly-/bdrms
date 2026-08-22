@@ -1,0 +1,31 @@
+add an admin user with username is "admin" and password is "admin123" 
+
+
+Here are your current database details from apps/api/.env:
+
+DB Engine: PostgreSQL
+Host: localhost
+Port: 5432
+Database: bdrms
+Username: postgres
+Password: postgres
+Connection URL: postgres://postgres:postgres@localhost:5432/bdrms
+Tables created (from your Drizzle schema/migration)
+buildings
+flats
+users
+standard_user_profiles
+staff_profiles
+system_configs
+bills
+Also created:
+
+Enum type: user_role (admin, staff, user)
+Unique index: uq_flats_building_flat on flats(building_id, flat_no)
+If you want to view all tables directly in Postgres:
+
+psql "postgres://postgres:postgres@localhost:5432/bdrms" -c "\dt"
+Or via Docker (if using the container):
+
+
+docker exec -it bdrms-postgres psql -U postgres -d bdrms -c "\dt"

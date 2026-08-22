@@ -9,12 +9,13 @@ import { getApiBaseUrl } from "@/lib/api";
 
 type LoginResponse = {
   accessToken: string;
-  role: "admin" | "staff" | "user";
+  role: "admin" | "building_admin" | "staff" | "user";
 };
 
 function redirectPathForRole(role: string): string {
   switch (role) {
     case "admin":
+    case "building_admin":
       return "/admin";
     case "staff":
       return "/staff";

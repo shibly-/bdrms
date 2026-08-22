@@ -63,6 +63,7 @@ type UpdateStaffDto = Partial<CreateStaffDto>;
 type SystemConfigDto = {
   gasUnitName: string;
   gasUnitPrice: number;
+  operatingCostPerFlat?: number;
 };
 
 @Injectable()
@@ -502,11 +503,13 @@ export class AdminService {
   async createSystemConfig(dto: SystemConfigDto) {
     this.requireText(dto.gasUnitName, 'gasUnitName');
     this.requirePositiveNumber(dto.gasUnitPrice, 'gasUnitPrice');
+    const operatingCostPerFlat = this.resolveOperatingCostPerFlat(dto);
     const [row] = await this.db
       .insert(schema.systemConfigs)
       .values({
         gasUnitName: dto.gasUnitName.trim(),
         gasUnitPrice: dto.gasUnitPrice.toFixed(2),
+        operatingCostPerFlat: operatingCostPerFlat.toFixed(2),
       })
       .returning();
     return row;
@@ -515,6 +518,7 @@ export class AdminService {
   async updateSystemConfig(dto: SystemConfigDto) {
     this.requireText(dto.gasUnitName, 'gasUnitName');
     this.requirePositiveNumber(dto.gasUnitPrice, 'gasUnitPrice');
+    const operatingCostPerFlat = this.resolveOperatingCostPerFlat(dto);
 
     const [current] = await this.db
       .select()
@@ -529,11 +533,27 @@ export class AdminService {
       .set({
         gasUnitName: dto.gasUnitName.trim(),
         gasUnitPrice: dto.gasUnitPrice.toFixed(2),
+        operatingCostPerFlat: operatingCostPerFlat.toFixed(2),
         updatedAt: new Date(),
       })
       .where(eq(schema.systemConfigs.id, current.id))
       .returning();
     return row;
+  }
+
+  private resolveOperatingCostPerFlat(dto: SystemConfigDto): number {
+    if (dto.operatingCostPerFlat === undefined) {
+      return 1;
+    }
+    if (
+      !Number.isFinite(dto.operatingCostPerFlat) ||
+      dto.operatingCostPerFlat < 0
+    ) {
+      throw new BadRequestException(
+        'operatingCostPerFlat must be a non-negative number',
+      );
+    }
+    return dto.operatingCostPerFlat;
   }
 
   async deleteSystemConfig() {

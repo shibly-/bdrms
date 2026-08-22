@@ -7,13 +7,15 @@ import { adminFetch } from "@/lib/admin-client";
 export default function UserPage() {
   const [unitName, setUnitName] = useState("Gas Unit");
   const [unitPrice, setUnitPrice] = useState<number>(0);
+  const [operatingCostPerFlat, setOperatingCostPerFlat] = useState<number>(0);
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    void adminFetch<{ gasUnitName: string; gasUnitPrice: number }>("/billing/unit-config")
+    void adminFetch<{ gasUnitName: string; gasUnitPrice: number; operatingCostPerFlat: number }>("/billing/unit-config")
       .then((data) => {
         setUnitName(data.gasUnitName || "Gas Unit");
         setUnitPrice(Number(data.gasUnitPrice || 0));
+        setOperatingCostPerFlat(Number(data.operatingCostPerFlat || 0));
       })
       .catch((e) => setErr(e instanceof Error ? e.message : "Failed to load gas unit price."));
   }, []);
@@ -38,10 +40,14 @@ export default function UserPage() {
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
           Use the Profile page to view your account details and Gas Billing History
           page to review your billing records.
-        </p>
+        </p>        
         <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">
           Current {unitName} Price: <span className="font-semibold">{unitPrice.toFixed(2)}</span>
         </div>
+        <div className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">
+          Operating Cost Per Flat: <span className="font-semibold">{operatingCostPerFlat.toFixed(2)}</span>
+        </div>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">&nbsp;Note: 1 m3 == 1.8315 kg</p>
       </section>
     </AppShell>
   );

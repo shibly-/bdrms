@@ -67,9 +67,11 @@ export function HomeScreen({
   const roleLabel =
     session?.role === 'admin'
       ? 'Administrator'
-      : session?.role === 'staff'
-        ? 'Staff'
-        : 'Resident';
+      : session?.role === 'building_admin'
+        ? 'Building admin'
+        : session?.role === 'staff'
+          ? 'Staff'
+          : 'Resident';
 
   return (
     <ScrollView

@@ -12,7 +12,12 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
-export const userRoleEnum = pgEnum('user_role', ['admin', 'staff', 'user']);
+export const userRoleEnum = pgEnum('user_role', [
+  'admin',
+  'building_admin',
+  'staff',
+  'user',
+]);
 
 export const buildings = pgTable('buildings', {
   id: serial('id').primaryKey(),
@@ -86,6 +91,12 @@ export const systemConfigs = pgTable('system_configs', {
     precision: 12,
     scale: 2,
   }).notNull(),
+  operatingCostPerFlat: numeric('operating_cost_per_flat', {
+    precision: 12,
+    scale: 2,
+  })
+    .notNull()
+    .default('1'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 

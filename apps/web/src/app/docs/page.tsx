@@ -189,6 +189,7 @@ export default function DocsPage() {
             <li>
               <strong className="text-zinc-800 dark:text-zinc-100">Roles:</strong>{" "}
               <code className="rounded bg-zinc-200 px-1 py-0.5 text-xs dark:bg-zinc-800">admin</code>,{" "}
+              <code className="rounded bg-zinc-200 px-1 py-0.5 text-xs dark:bg-zinc-800">building_admin</code> (same portal/API access as admin),{" "}
               <code className="rounded bg-zinc-200 px-1 py-0.5 text-xs dark:bg-zinc-800">staff</code>, and{" "}
               <code className="rounded bg-zinc-200 px-1 py-0.5 text-xs dark:bg-zinc-800">user</code> (resident) with JWT-based access to API routes.
             </li>

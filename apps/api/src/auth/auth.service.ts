@@ -301,8 +301,11 @@ export class AuthService {
   }
 
   private resolveDemoRole(userName: string): UserRole {
-    if (userName.startsWith('admin')) return UserRole.Admin;
-    if (userName.startsWith('staff')) return UserRole.Staff;
+    const lower = userName.toLowerCase();
+    if (lower.startsWith('buildingadmin') || lower.startsWith('bldg_admin'))
+      return UserRole.BuildingAdmin;
+    if (lower.startsWith('admin')) return UserRole.Admin;
+    if (lower.startsWith('staff')) return UserRole.Staff;
     return UserRole.User;
   }
 }

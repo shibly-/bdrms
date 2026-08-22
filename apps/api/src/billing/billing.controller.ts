@@ -1,4 +1,8 @@
 import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  ADMIN_STAFF_ROLES,
+  ADMIN_STAFF_USER_ROLES,
+} from '../common/admin-roles';
 import { UserRole } from '../common/types';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -11,7 +15,7 @@ export class BillingController {
   constructor(private readonly billingService: BillingService) {}
 
   @Post('calculate')
-  @Roles(UserRole.Admin, UserRole.Staff)
+  @Roles(...ADMIN_STAFF_ROLES)
   calculate(
     @Body()
     body: {
@@ -24,7 +28,7 @@ export class BillingController {
   }
 
   @Post('ocr')
-  @Roles(UserRole.Admin, UserRole.Staff)
+  @Roles(...ADMIN_STAFF_ROLES)
   extractReading(@Body() body: { imageUrl: string }) {
     const ocrReading = this.billingService.extractReadingFromImage(
       body.imageUrl,
@@ -33,13 +37,13 @@ export class BillingController {
   }
 
   @Get('flat-context')
-  @Roles(UserRole.Admin, UserRole.Staff)
+  @Roles(...ADMIN_STAFF_ROLES)
   getFlatContext(@Query('flatId') flatId?: string) {
     return this.billingService.getFlatBillingContext(Number(flatId));
   }
 
   @Post('generate')
-  @Roles(UserRole.Admin, UserRole.Staff)
+  @Roles(...ADMIN_STAFF_ROLES)
   generate(
     @Req() req: { user?: { sub?: number } },
     @Body()
@@ -57,13 +61,13 @@ export class BillingController {
   }
 
   @Get('unit-config')
-  @Roles(UserRole.Admin, UserRole.Staff, UserRole.User)
+  @Roles(...ADMIN_STAFF_USER_ROLES)
   getUnitConfig() {
     return this.billingService.getCurrentUnitConfig();
   }
 
   @Get('monthly')
-  @Roles(UserRole.Admin, UserRole.Staff)
+  @Roles(...ADMIN_STAFF_ROLES)
   async getMonthly(@Query('month') month?: string) {
     const now = new Date();
     const targetMonth =
@@ -76,7 +80,7 @@ export class BillingController {
   }
 
   @Get('history')
-  @Roles(UserRole.Admin, UserRole.Staff, UserRole.User)
+  @Roles(...ADMIN_STAFF_USER_ROLES)
   getHistory(
     @Req()
     req: { user?: { role?: UserRole; userName?: string } },
