@@ -2,7 +2,10 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { BillingMeterImageCell } from "@/components/billing-meter-image-cell";
+import {
+  BillingHistoryList,
+  type BillingSortKey,
+} from "@/components/billing-history-list";
 import {
   GasBillDetailModal,
   type GasBillDetailRow,
@@ -25,7 +28,7 @@ export default function StaffGasBillingHistoryPage() {
   });
   const [rows, setRows] = useState<BillingRow[]>([]);
   const [err, setErr] = useState("");
-  const [sortKey, setSortKey] = useState<"billingDate" | "userName" | "gasMeterNo" | "totalBill">("billingDate");
+  const [sortKey, setSortKey] = useState<BillingSortKey>("billingDate");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [detailBill, setDetailBill] = useState<BillingRow | null>(null);
 
@@ -57,7 +60,7 @@ export default function StaffGasBillingHistoryPage() {
     }
   }
 
-  function toggleSort(next: "billingDate" | "userName" | "gasMeterNo" | "totalBill") {
+  function toggleSort(next: BillingSortKey) {
     if (sortKey === next) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
       return;
@@ -104,59 +107,16 @@ export default function StaffGasBillingHistoryPage() {
           <button className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white">Apply Filters</button>
         </form>
       </section>
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="mb-4 font-semibold">Billing List</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-200 text-left">
-                <th><button onClick={() => toggleSort("billingDate")} className="font-semibold">Date</button></th>
-                <th><button onClick={() => toggleSort("userName")} className="font-semibold">User</button></th>
-                <th><button onClick={() => toggleSort("gasMeterNo")} className="font-semibold">Meter</button></th>
-                <th>Building</th>
-                <th>Flat</th>
-                <th>Previous</th>
-                <th>Current</th>
-                <th>Usage (m³)</th>
-                <th>Unit Price</th>
-                <th><button onClick={() => toggleSort("totalBill")} className="font-semibold">Total Bill</button></th>
-                <th>Meter image</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRows.map((r) => (
-                <tr key={r.billId} className="border-b border-zinc-100">
-                  <td className="py-2">{r.billingDate}</td>
-                  <td>{r.fullName} ({r.userName})</td>
-                  <td>{r.gasMeterNo}</td>
-                  <td>{r.buildingName}</td>
-                  <td>{r.flatNo}</td>
-                  <td>{r.previousReading}</td>
-                  <td>{r.currentReading}</td>
-                  <td>{r.usageQuantity}</td>
-                  <td>{r.unitPrice}</td>
-                  <td>{r.totalBill}</td>
-                  <td className="align-middle">
-                    <BillingMeterImageCell src={r.ocrImageUrl} />
-                  </td>
-                  <td className="align-middle">
-                    <button
-                      type="button"
-                      onClick={() => setDetailBill(r)}
-                      className="rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
-                    >
-                      Details
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {sortedRows.length === 0 ? (
-                <tr><td className="py-3 text-zinc-500" colSpan={12}>No billing rows found.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+        <BillingHistoryList
+          rows={sortedRows}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onToggleSort={toggleSort}
+          onOpenDetails={setDetailBill}
+          showUser
+        />
       </section>
 
       <GasBillDetailModal bill={detailBill} onClose={() => setDetailBill(null)} />

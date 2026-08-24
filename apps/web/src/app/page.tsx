@@ -8,14 +8,13 @@ export default function Home() {
       <section className="flex flex-wrap items-center justify-center gap-3">
         <div className="flex items-center gap-2">
           <Flame className="h-6 w-6" aria-hidden/>
-          <h2 className="text-2xl font-semibold text-zinc-900">LPG Reticulation Billing System</h2>
+          <h2 className="text-2xl font-semibold text-zinc-900">PRRMS - Billing System</h2>
         </div>     
       </section>
 
        <section className="flex flex-wrap items-center justify-center gap-3">
         <p className="mt-1 max-w-2xl text-sm text-zinc-600 dark:text-zinc-300">
-          A unified platform for admin operations, staff billing workflows, and
-          resident self-service.
+          A platform for admin, staff, and resident self-service.
         </p>
       </section>
 
@@ -84,13 +83,14 @@ export default function Home() {
       
       <section className="flex flex-wrap items-center justify-center gap-3">
         <p className="mt-1 max-w-2xl text-sm text-zinc-600 dark:text-zinc-300">
-          Address: Protik Ruposree, House # 78, Road # 12/4, Block # J, South Banasree, Dhaka-1219
+          Protik Ruposree, House # 78, Road # 12/4, 
+          <br />Block # J, South Banasree, Dhaka-1219
         </p>        
       </section>
       <section className="flex flex-wrap items-center justify-center gap-3">
         <Link
             href="https://www.linkedin.com/in/shibly/"
-            className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
+            className="text-sm font-medium text-blue-600 hover:text-blue-900 dark:text-blue-300 dark:hover:text-white"
           >
             Developed By: A S M Abdur Rab
           </Link>
