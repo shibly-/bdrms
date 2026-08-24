@@ -117,7 +117,7 @@ export function AppShell({ title, subtitle, menu, children }: AppShellProps) {
               <Flame className="h-4 w-4" />
             </span>
             <span className="text-sm font-semibold tracking-wide text-zinc-900">
-              BDRMS
+              PRRMS
             </span>
           </Link>
           <div className="flex items-center gap-2 text-sm">

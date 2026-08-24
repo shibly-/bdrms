@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "LPG Reticulation Billing System",
-  description: "Admin, staff and user portal for gas billing management",
+  description: "Admin, staff and user portal for LPG gas billing management",
 };
 
 export default function RootLayout({

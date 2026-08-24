@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Create account | BDRMS",
+  title: "Create account | PRRMS",
   description: "Register as a resident for gas billing and meter access",
 };
 

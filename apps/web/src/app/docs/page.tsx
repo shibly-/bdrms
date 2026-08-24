@@ -3,9 +3,9 @@ import Link from "next/link";
 import { ArrowLeft, BookOpen, ExternalLink } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Documentation | BDRMS",
+  title: "Documentation | PRRMS",
   description:
-    "Technical stack, architecture, setup, and repository information for the BDRMS LPG billing platform.",
+    "Technical stack, architecture, setup, and repository information for the PRRMS LPG billing platform.",
 };
 
 const REPO_WEB = "https://github.com/shibly-/bdrms";
@@ -20,7 +20,7 @@ function ArchitectureDiagram() {
         role="img"
         aria-label="System architecture: clients, API, ORM, database"
       >
-        <title>BDRMS architecture</title>
+        <title>PRRMS architecture</title>
         <defs>
           <marker id="doc-arch-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
             <path d="M0,0 L8,4 L0,8 Z" fill="currentColor" />
@@ -141,9 +141,9 @@ export default function DocsPage() {
       </header>
 
       <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <h1 className="text-3xl font-bold tracking-tight">BDRMS documentation</h1>
+        <h1 className="text-3xl font-bold tracking-tight">PRRMS documentation</h1>
         <p className="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
-          BDRMS (Building / residential gas billing) is an LPG reticulation billing monorepo: web portals for
+          PRRMS (Building / residential gas billing) is an LPG reticulation billing monorepo: web portals for
           admin, staff, and residents, a NestJS API, and optional Expo mobile client—all backed by PostgreSQL.
         </p>
 

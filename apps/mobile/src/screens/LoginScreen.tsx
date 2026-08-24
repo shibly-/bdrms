@@ -1,3 +1,4 @@
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,8 +13,11 @@ import {
 import { apiFetch } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import type { AuthSession } from '../auth/session';
+import type { RootStackParamList } from '../navigation/types';
 
-export function LoginScreen() {
+type Nav = NativeStackNavigationProp<RootStackParamList, 'Login'>;
+
+export function LoginScreen({ navigation }: { navigation: Nav }) {
   const { signIn } = useAuth();
   const [userName, setUserName] = useState('');
   const [password, setPassword] = useState('');
@@ -31,6 +35,10 @@ export function LoginScreen() {
       });
       if (!res.accessToken || !res.role) {
         setError('Unexpected response from server.');
+        return;
+      }
+      if (res.role !== 'user') {
+        setError('This app is for residents only. Admin and staff must use the web portal.');
         return;
       }
       await signIn({
@@ -78,6 +86,14 @@ export function LoginScreen() {
           ) : (
             <Text style={styles.buttonText}>Sign in</Text>
           )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.linkRow}
+          onPress={() => navigation.navigate('Register')}
+          disabled={loading}
+        >
+          <Text style={styles.linkMuted}>New resident? </Text>
+          <Text style={styles.link}>Create an account</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -133,5 +149,20 @@ const styles = StyleSheet.create({
   error: {
     color: '#dc2626',
     fontSize: 14,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  linkMuted: {
+    color: '#64748b',
+    fontSize: 14,
+  },
+  link: {
+    color: '#2563eb',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
