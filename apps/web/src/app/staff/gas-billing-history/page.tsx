@@ -11,6 +11,15 @@ import {
   type GasBillDetailRow,
 } from "@/components/gas-bill-detail-modal";
 import { adminFetch } from "@/lib/admin-client";
+import { downloadBillingHistoryCsv } from "@/lib/billing-history-csv";
+import {
+  billingAlertErr,
+  billingButton,
+  billingH2,
+  billingInput,
+  billingSection,
+} from "@/lib/billing-ui";
+import { STAFF_NAV } from "@/lib/staff-nav";
 
 type BillingRow = GasBillDetailRow;
 type Building = { id: number; name: string; buildingNo: string | null };
@@ -52,11 +61,21 @@ export default function StaffGasBillingHistoryPage() {
     e?.preventDefault();
     try {
       setErr("");
-      const params = new URLSearchParams(Object.entries(filters).filter(([, v]) => String(v).length > 0)).toString();
-      const res = await adminFetch<{ items: BillingRow[] }>(`/billing/history?${params}`);
+      const params = new URLSearchParams(Object.entries(filters).filter(([, v]) => String(v).length > 0));
+      params.set("status", "paid,cancelled");
+      const res = await adminFetch<{ items: BillingRow[] }>(`/billing/history?${params.toString()}`);
       setRows(res.items ?? []);
     } catch (error) {
       setErr(error instanceof Error ? error.message : "Failed to load billing history.");
+    }
+  }
+
+  async function openBillById(billId: number) {
+    try {
+      const row = await adminFetch<BillingRow>(`/billing/bill/${billId}`);
+      setDetailBill(row);
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : "Failed to load bill.");
     }
   }
 
@@ -71,9 +90,16 @@ export default function StaffGasBillingHistoryPage() {
 
   const sortedRows = useMemo(() => {
     return [...rows].sort((a, b) => {
-      const cmp = sortKey === "totalBill"
-        ? Number(a.totalBill) - Number(b.totalBill)
-        : String(a[sortKey] ?? "").localeCompare(String(b[sortKey] ?? ""));
+      let cmp: number;
+      if (sortKey === "billId") {
+        cmp = a.billId - b.billId;
+      } else if (sortKey === "totalBill") {
+        cmp = Number(a.totalBill) - Number(b.totalBill);
+      } else if (sortKey === "billingDate") {
+        cmp = String(a.billingDate).localeCompare(String(b.billingDate));
+      } else {
+        cmp = String(a[sortKey] ?? "").localeCompare(String(b[sortKey] ?? ""));
+      }
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [rows, sortKey, sortDir]);
@@ -82,33 +108,39 @@ export default function StaffGasBillingHistoryPage() {
     <AppShell
       title="Gas Billing History"
       subtitle="Staff view of generated gas bills with search filters."
-      menu={[
-        { href: "/staff", label: "Overview" },
-        { href: "/staff/profile", label: "Profile" },
-        { href: "/staff/gas-billing-form", label: "Gas Billing Form" },
-        { href: "/staff/gas-billing-history", label: "Gas Billing History" },
-      ]}
+      menu={STAFF_NAV}
+      compact
     >
-      {err ? <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{err}</section> : null}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-4 font-semibold">Filters</h2>
-        <form className="grid gap-3 md:grid-cols-6" onSubmit={loadHistory}>
-          <input type="month" className="rounded-md border border-zinc-300 p-2" value={filters.month} onChange={(e) => setFilters((v) => ({ ...v, month: e.target.value }))} />
-          <input className="rounded-md border border-zinc-300 p-2" placeholder="User Name" value={filters.userName} onChange={(e) => setFilters((v) => ({ ...v, userName: e.target.value }))} />
-          <input className="rounded-md border border-zinc-300 p-2" placeholder="Gas Meter No" value={filters.gasMeterNo} onChange={(e) => setFilters((v) => ({ ...v, gasMeterNo: e.target.value }))} />
-          <select className="rounded-md border border-zinc-300 p-2" value={filters.buildingId} onChange={(e) => setFilters((v) => ({ ...v, buildingId: e.target.value, flatId: "" }))}>
+      {err ? <section className={billingAlertErr}>{err}</section> : null}
+      <section className={billingSection}>
+        <h2 className={billingH2}>Filters</h2>
+        <form className="grid gap-2 md:grid-cols-6" onSubmit={loadHistory}>
+          <input type="month" className={billingInput} value={filters.month} onChange={(e) => setFilters((v) => ({ ...v, month: e.target.value }))} />
+          <input className={billingInput} placeholder="User Name" value={filters.userName} onChange={(e) => setFilters((v) => ({ ...v, userName: e.target.value }))} />
+          <input className={billingInput} placeholder="Gas Meter No" value={filters.gasMeterNo} onChange={(e) => setFilters((v) => ({ ...v, gasMeterNo: e.target.value }))} />
+          <select className={billingInput} value={filters.buildingId} onChange={(e) => setFilters((v) => ({ ...v, buildingId: e.target.value, flatId: "" }))}>
             <option value="">Building No</option>
             {buildings.map((b) => <option key={b.id} value={b.id}>{b.buildingNo ? `${b.buildingNo} (${b.name})` : b.name}</option>)}
           </select>
-          <select className="rounded-md border border-zinc-300 p-2" value={filters.flatId} onChange={(e) => setFilters((v) => ({ ...v, flatId: e.target.value }))}>
+          <select className={billingInput} value={filters.flatId} onChange={(e) => setFilters((v) => ({ ...v, flatId: e.target.value }))}>
             <option value="">Flat No</option>
             {flats.map((f) => <option key={f.id} value={f.id}>{f.flatNo}</option>)}
           </select>
-          <button className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white">Apply Filters</button>
+          <button className={billingButton}>Apply Filters</button>
         </form>
       </section>
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-4 font-semibold">Billing List</h2>
+      <section className={billingSection}>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold">Billing List</h2>
+          <button
+            type="button"
+            onClick={() => downloadBillingHistoryCsv(sortedRows)}
+            disabled={sortedRows.length === 0}
+            className="rounded border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-800 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+          >
+            Download CSV
+          </button>
+        </div>
         <BillingHistoryList
           rows={sortedRows}
           sortKey={sortKey}
@@ -119,7 +151,11 @@ export default function StaffGasBillingHistoryPage() {
         />
       </section>
 
-      <GasBillDetailModal bill={detailBill} onClose={() => setDetailBill(null)} />
+      <GasBillDetailModal
+        bill={detailBill}
+        onClose={() => setDetailBill(null)}
+        onOpenBill={openBillById}
+      />
     </AppShell>
   );
 }

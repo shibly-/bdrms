@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { AppShell } from "@/components/app-shell";
+import { STAFF_NAV } from "@/lib/staff-nav";
 
 type JwtPayload = {
   sub?: number;
@@ -32,12 +33,7 @@ export default function StaffProfilePage() {
     <AppShell
       title="Staff Profile"
       subtitle="Profile information for the logged-in staff account."
-      menu={[
-        { href: "/staff", label: "Overview" },
-        { href: "/staff/profile", label: "Profile" },
-        { href: "/staff/gas-billing-form", label: "Gas Billing Form" },
-        { href: "/staff/gas-billing-history", label: "Gas Billing History" },
-      ]}
+      menu={STAFF_NAV}
     >
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <h2 className="mb-4 font-semibold">Account Details</h2>

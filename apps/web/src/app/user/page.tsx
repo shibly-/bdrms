@@ -22,11 +22,11 @@ export default function UserPage() {
 
   return (
     <AppShell
-      title="Resident Portal"
-      subtitle="Manage your profile and check personal gas billing history."
+      title="PRRMS - LPG Gas Billing System"
+      subtitle="Check your current gas bill and previous billing history..."
       menu={[
         { href: "/user", label: "Overview" },
-        { href: "/user/profile", label: "Profile" },
+        { href: "/user/profile", label: "User Profile" },
         { href: "/user/gas-billing-history", label: "Gas Billing History" },
       ]}
     >
@@ -36,10 +36,9 @@ export default function UserPage() {
         </section>
       ) : null}
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="font-semibold">Resident Overview</h2>
+        <h2 className="font-semibold">LPG Gas Billing Details</h2>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-          Use the Profile page to view your account details and Gas Billing History
-          page to review your billing records.
+          Gas consumption measured in cubic meters (m3) is converted to kilograms (kg) to determine total costs. <b>Note: 1 m3 == 1.8315 kg</b>
         </p>        
         <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">
           Current {unitName} Price: <span className="font-semibold">{unitPrice.toFixed(2)}</span>
@@ -47,7 +46,7 @@ export default function UserPage() {
         <div className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">
           Operating Cost Per Flat: <span className="font-semibold">{operatingCostPerFlat.toFixed(2)}</span>
         </div>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">&nbsp;Note: 1 m3 == 1.8315 kg</p>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300"></p>
       </section>
     </AppShell>
   );

@@ -13,9 +13,17 @@ import {
 import { useUserRole } from "@/hooks/use-user-role";
 import { adminFetch } from "@/lib/admin-client";
 import { getAdminNavForRole } from "@/lib/admin-nav";
+import { downloadBillingHistoryCsv } from "@/lib/billing-history-csv";
+import {
+  billingAlertErr,
+  billingButton,
+  billingH2,
+  billingInput,
+  billingSection,
+} from "@/lib/billing-ui";
 
 type BillingRow = GasBillDetailRow;
-type Building = { id: number; name: string; buildingNo: string | null };
+type Building = { id: number; name: string; buildingNo: string | null; isActive?: number };
 type Flat = { id: number; flatNo: string; buildingId: number };
 
 export default function GasBillingHistoryPage() {
@@ -37,7 +45,9 @@ export default function GasBillingHistoryPage() {
 
   useEffect(() => {
     void adminFetch<Building[]>("/admin/buildings")
-      .then(setBuildings)
+      .then((data) =>
+        setBuildings(data.filter((b) => Number(b.isActive ?? 1) === 1)),
+      )
       .catch(() => {});
   }, []);
 
@@ -57,11 +67,23 @@ export default function GasBillingHistoryPage() {
       setErr("");
       const params = new URLSearchParams(
         Object.entries(filters).filter(([, v]) => String(v).length > 0),
-      ).toString();
-      const res = await adminFetch<{ items: BillingRow[] }>(`/billing/history?${params}`);
+      );
+      params.set("status", "paid,cancelled");
+      const res = await adminFetch<{ items: BillingRow[] }>(
+        `/billing/history?${params.toString()}`,
+      );
       setRows(res.items ?? []);
     } catch (error) {
       setErr(error instanceof Error ? error.message : "Failed to load billing history.");
+    }
+  }
+
+  async function openBillById(billId: number) {
+    try {
+      const row = await adminFetch<BillingRow>(`/billing/bill/${billId}`);
+      setDetailBill(row);
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : "Failed to load bill.");
     }
   }
 
@@ -76,10 +98,16 @@ export default function GasBillingHistoryPage() {
 
   const sortedRows = useMemo(() => {
     return [...rows].sort((a, b) => {
-      const cmp =
-        sortKey === "totalBill"
-          ? Number(a.totalBill) - Number(b.totalBill)
-          : String(a[sortKey] ?? "").localeCompare(String(b[sortKey] ?? ""));
+      let cmp: number;
+      if (sortKey === "billId") {
+        cmp = a.billId - b.billId;
+      } else if (sortKey === "totalBill") {
+        cmp = Number(a.totalBill) - Number(b.totalBill);
+      } else if (sortKey === "billingDate") {
+        cmp = String(a.billingDate).localeCompare(String(b.billingDate));
+      } else {
+        cmp = String(a[sortKey] ?? "").localeCompare(String(b[sortKey] ?? ""));
+      }
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [rows, sortKey, sortDir]);
@@ -89,21 +117,18 @@ export default function GasBillingHistoryPage() {
       title="Gas Billing History"
       subtitle="Admin view of generated gas bills with search filters."
       menu={getAdminNavForRole(role)}
+      compact
     >
-      {err ? (
-        <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-200">
-          {err}
-        </section>
-      ) : null}
+      {err ? <section className={billingAlertErr}>{err}</section> : null}
 
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-4 font-semibold">Filters</h2>
-        <form className="grid gap-3 md:grid-cols-6" onSubmit={loadHistory}>
-          <input type="month" className="rounded-md border border-zinc-300 p-2" value={filters.month} onChange={(e) => setFilters((v) => ({ ...v, month: e.target.value }))} />
-          <input className="rounded-md border border-zinc-300 p-2" placeholder="User Name" value={filters.userName} onChange={(e) => setFilters((v) => ({ ...v, userName: e.target.value }))} />
-          <input className="rounded-md border border-zinc-300 p-2" placeholder="Gas Meter No" value={filters.gasMeterNo} onChange={(e) => setFilters((v) => ({ ...v, gasMeterNo: e.target.value }))} />
+      <section className={billingSection}>
+        <h2 className={billingH2}>Filters</h2>
+        <form className="grid gap-2 md:grid-cols-6" onSubmit={loadHistory}>
+          <input type="month" className={billingInput} value={filters.month} onChange={(e) => setFilters((v) => ({ ...v, month: e.target.value }))} />
+          <input className={billingInput} placeholder="User Name" value={filters.userName} onChange={(e) => setFilters((v) => ({ ...v, userName: e.target.value }))} />
+          <input className={billingInput} placeholder="Gas Meter No" value={filters.gasMeterNo} onChange={(e) => setFilters((v) => ({ ...v, gasMeterNo: e.target.value }))} />
           <select
-            className="rounded-md border border-zinc-300 p-2"
+            className={billingInput}
             value={filters.buildingId}
             onChange={(e) =>
               setFilters((v) => ({ ...v, buildingId: e.target.value, flatId: "" }))
@@ -117,7 +142,7 @@ export default function GasBillingHistoryPage() {
             ))}
           </select>
           <select
-            className="rounded-md border border-zinc-300 p-2"
+            className={billingInput}
             value={filters.flatId}
             onChange={(e) => setFilters((v) => ({ ...v, flatId: e.target.value }))}
           >
@@ -126,12 +151,22 @@ export default function GasBillingHistoryPage() {
               <option key={f.id} value={f.id}>{f.flatNo}</option>
             ))}
           </select>
-          <button className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white">Apply Filters</button>
+          <button className={billingButton}>Apply Filters</button>
         </form>
       </section>
 
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-4 font-semibold">Billing List</h2>
+      <section className={billingSection}>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold">Billing List</h2>
+          <button
+            type="button"
+            onClick={() => downloadBillingHistoryCsv(sortedRows)}
+            disabled={sortedRows.length === 0}
+            className="rounded border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-800 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+          >
+            Download CSV
+          </button>
+        </div>
         <BillingHistoryList
           rows={sortedRows}
           sortKey={sortKey}
@@ -142,7 +177,11 @@ export default function GasBillingHistoryPage() {
         />
       </section>
 
-      <GasBillDetailModal bill={detailBill} onClose={() => setDetailBill(null)} />
+      <GasBillDetailModal
+        bill={detailBill}
+        onClose={() => setDetailBill(null)}
+        onOpenBill={openBillById}
+      />
     </AppShell>
   );
 }

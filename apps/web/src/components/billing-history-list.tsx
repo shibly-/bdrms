@@ -1,11 +1,14 @@
 "use client";
 
 import { ArrowDown, ArrowUp, ChevronsUpDown, FileText } from "lucide-react";
-import { BillingMeterImageCell } from "@/components/billing-meter-image-cell";
-import type { GasBillDetailRow } from "@/components/gas-bill-detail-modal";
-import { formatMoney } from "@/lib/format";
+import type {
+  BillStatus,
+  GasBillDetailRow,
+} from "@/components/gas-bill-detail-modal";
+import { formatBillDateTime, formatMoney } from "@/lib/format";
 
 export type BillingSortKey =
+  | "billId"
   | "billingDate"
   | "userName"
   | "gasMeterNo"
@@ -50,7 +53,7 @@ function HeaderCell({
   align?: "left" | "right";
 }) {
   const base =
-    "px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400";
+    "px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400";
   const alignCls = align === "right" ? "text-right" : "text-left";
   if (!sortable || !columnKey) {
     return <th className={`${base} ${alignCls}`}>{label}</th>;
@@ -69,6 +72,28 @@ function HeaderCell({
         <SortIndicator active={active} dir={dir} />
       </button>
     </th>
+  );
+}
+
+const STATUS_STYLES: Record<BillStatus, string> = {
+  unpaid:
+    "bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:ring-amber-900/40",
+  paid: "bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900/40",
+  cancelled:
+    "bg-red-100 text-red-700 ring-red-200 dark:bg-red-950/30 dark:text-red-300 dark:ring-red-900/40",
+};
+
+function StatusBadge({ status }: { status?: BillStatus }) {
+  if (!status) {
+    return <span className="text-zinc-400 dark:text-zinc-500">—</span>;
+  }
+  const label = status.charAt(0).toUpperCase() + status.slice(1);
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ring-1 ring-inset ${STATUS_STYLES[status]}`}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -106,6 +131,7 @@ export function BillingHistoryList({
   }
 
   const sortOptions: { key: BillingSortKey; label: string }[] = [
+    { key: "billId", label: "Id" },
     { key: "billingDate", label: "Date" },
     ...(showUser ? [{ key: "userName" as const, label: "User" }] : []),
     { key: "gasMeterNo", label: "Meter" },
@@ -153,8 +179,11 @@ export function BillingHistoryList({
           >
             <div className="flex items-start justify-between gap-3 border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-                  {r.billingDate}
+                <p className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                  Bill #{r.billId}
+                </p>
+                <p className="text-sm font-semibold text-zinc-900 tabular-nums dark:text-zinc-50">
+                  {formatBillDateTime(r.billingDate)}
                 </p>
                 <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">
                   {showUser ? `${r.fullName} · ` : ""}
@@ -185,7 +214,7 @@ export function BillingHistoryList({
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t border-zinc-100 px-4 py-3 dark:border-zinc-800">
-              <BillingMeterImageCell src={r.ocrImageUrl} />
+              <StatusBadge status={r.status} />
               <button
                 type="button"
                 onClick={() => onOpenDetails(r)}
@@ -203,6 +232,7 @@ export function BillingHistoryList({
         <table className="min-w-full text-sm">
           <thead className="bg-zinc-50 dark:bg-zinc-800/50">
             <tr className="border-b border-zinc-200 dark:border-zinc-800">
+              <HeaderCell label="Id" sortable columnKey="billId" align="right" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
               <HeaderCell label="Date" sortable columnKey="billingDate" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
               {showUser ? (
                 <HeaderCell label="User" sortable columnKey="userName" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
@@ -215,7 +245,7 @@ export function BillingHistoryList({
               <HeaderCell label="Usage m³" align="right" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
               <HeaderCell label="Unit price" align="right" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
               <HeaderCell label="Total bill" sortable columnKey="totalBill" align="right" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
-              <HeaderCell label="Meter image" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
+              <HeaderCell label="Status" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
               <HeaderCell label="Actions" align="right" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
             </tr>
           </thead>
@@ -225,25 +255,26 @@ export function BillingHistoryList({
                 key={r.billId}
                 className="transition hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40"
               >
-                <td className="whitespace-nowrap px-3 py-2.5 text-zinc-700 dark:text-zinc-200">{r.billingDate}</td>
+                <td className="whitespace-nowrap px-2 py-1.5 text-right font-medium text-zinc-500 tabular-nums dark:text-zinc-400">#{r.billId}</td>
+                <td className="whitespace-nowrap px-2 py-1.5 text-zinc-700 tabular-nums dark:text-zinc-200">{formatBillDateTime(r.billingDate)}</td>
                 {showUser ? (
-                  <td className="px-3 py-2.5 text-zinc-700 dark:text-zinc-200">
+                  <td className="px-2 py-1.5 text-zinc-700 dark:text-zinc-200">
                     <span className="font-medium text-zinc-900 dark:text-zinc-100">{r.fullName}</span>
                     <span className="ml-1 text-zinc-400 dark:text-zinc-500">({r.userName})</span>
                   </td>
                 ) : null}
-                <td className="whitespace-nowrap px-3 py-2.5 text-zinc-700 dark:text-zinc-200">{r.gasMeterNo}</td>
-                <td className="px-3 py-2.5 text-zinc-700 dark:text-zinc-200">{r.buildingName}</td>
-                <td className="px-3 py-2.5 text-zinc-700 dark:text-zinc-200">{r.flatNo}</td>
-                <td className="px-3 py-2.5 text-right text-zinc-700 tabular-nums dark:text-zinc-200">{r.previousReading}</td>
-                <td className="px-3 py-2.5 text-right text-zinc-700 tabular-nums dark:text-zinc-200">{r.currentReading}</td>
-                <td className="px-3 py-2.5 text-right text-zinc-700 tabular-nums dark:text-zinc-200">{r.usageQuantity}</td>
-                <td className="px-3 py-2.5 text-right text-zinc-700 tabular-nums dark:text-zinc-200">{formatMoney(r.unitPrice)}</td>
-                <td className="px-3 py-2.5 text-right font-semibold text-zinc-900 tabular-nums dark:text-zinc-50">{formatMoney(r.totalBill)}</td>
-                <td className="px-3 py-2.5">
-                  <BillingMeterImageCell src={r.ocrImageUrl} />
+                <td className="whitespace-nowrap px-2 py-1.5 text-zinc-700 dark:text-zinc-200">{r.gasMeterNo}</td>
+                <td className="px-2 py-1.5 text-zinc-700 dark:text-zinc-200">{r.buildingName}</td>
+                <td className="px-2 py-1.5 text-zinc-700 dark:text-zinc-200">{r.flatNo}</td>
+                <td className="px-2 py-1.5 text-right text-zinc-700 tabular-nums dark:text-zinc-200">{r.previousReading}</td>
+                <td className="px-2 py-1.5 text-right text-zinc-700 tabular-nums dark:text-zinc-200">{r.currentReading}</td>
+                <td className="px-2 py-1.5 text-right text-zinc-700 tabular-nums dark:text-zinc-200">{r.usageQuantity}</td>
+                <td className="px-2 py-1.5 text-right text-zinc-700 tabular-nums dark:text-zinc-200">{formatMoney(r.unitPrice)}</td>
+                <td className="px-2 py-1.5 text-right font-semibold text-zinc-900 tabular-nums dark:text-zinc-50">{formatMoney(r.totalBill)}</td>
+                <td className="px-2 py-1.5">
+                  <StatusBadge status={r.status} />
                 </td>
-                <td className="px-3 py-2.5 text-right">
+                <td className="px-2 py-1.5 text-right">
                   <button
                     type="button"
                     onClick={() => onOpenDetails(r)}

@@ -19,6 +19,12 @@ export const userRoleEnum = pgEnum('user_role', [
   'user',
 ]);
 
+export const billStatusEnum = pgEnum('bill_status', [
+  'unpaid',
+  'paid',
+  'cancelled',
+]);
+
 export const buildings = pgTable('buildings', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 120 }).notNull(),
@@ -26,6 +32,7 @@ export const buildings = pgTable('buildings', {
   address1: varchar('address_1', { length: 220 }).notNull(),
   address2: varchar('address_2', { length: 220 }).notNull(),
   postCode: varchar('post_code', { length: 20 }).notNull(),
+  isActive: integer('is_active').notNull().default(1),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -105,7 +112,7 @@ export const bills = pgTable('bills', {
   standardUserId: integer('standard_user_id')
     .references(() => standardUserProfiles.id, { onDelete: 'cascade' })
     .notNull(),
-  billingDate: date('billing_date').notNull(),
+  billingDate: timestamp('billing_date', { mode: 'string' }).notNull(),
   previousReading: numeric('previous_reading', { precision: 12, scale: 3 }),
   currentReading: numeric('current_reading', {
     precision: 12,
@@ -118,6 +125,13 @@ export const bills = pgTable('bills', {
   unitPrice: numeric('unit_price', { precision: 12, scale: 2 }).notNull(),
   totalBill: numeric('total_bill', { precision: 12, scale: 2 }).notNull(),
   ocrImageUrl: text('ocr_image_url'),
+  status: billStatusEnum('status').notNull().default('unpaid'),
+  updateReason: varchar('update_reason', { length: 200 }),
+  billUpdatedAt: timestamp('bill_updated_at'),
+  // Self-referencing links (kept as plain integers to avoid self-FK typing).
+  previousBillId: integer('previous_bill_id'),
+  supersededByBillId: integer('superseded_by_bill_id'),
+  paidAt: timestamp('paid_at'),
   createdByUserId: integer('created_by_user_id').references(() => users.id, {
     onDelete: 'set null',
   }),

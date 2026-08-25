@@ -1,9 +1,22 @@
 "use client";
 
-import { useEffect } from "react";
-import { Flame, Gauge, ImageIcon, ReceiptText, User, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Download,
+  Flame,
+  Gauge,
+  History,
+  ImageIcon,
+  Loader2,
+  ReceiptText,
+  User,
+  X,
+} from "lucide-react";
 import { isPersistedMeterImageUrl } from "@/components/billing-meter-image-cell";
-import { formatMoney } from "@/lib/format";
+import { downloadBillPdf } from "@/lib/bill-pdf";
+import { formatBillDateTime, formatMoney } from "@/lib/format";
+
+export type BillStatus = "unpaid" | "paid" | "cancelled";
 
 export type GasBillDetailRow = {
   billId: number;
@@ -19,12 +32,35 @@ export type GasBillDetailRow = {
   unitPrice: string;
   totalBill: string;
   ocrImageUrl: string | null;
+  status?: BillStatus;
+  updateReason?: string | null;
+  billUpdatedAt?: string | null;
+  previousBillId?: number | null;
+  supersededByBillId?: number | null;
+  previousBillDate?: string | null;
+  createdAt?: string | null;
 };
 
 type Props = {
   bill: GasBillDetailRow | null;
   onClose: () => void;
+  /** When provided, previous/superseding bill references become clickable. */
+  onOpenBill?: (billId: number) => void;
 };
+
+const STATUS_BADGE: Record<BillStatus, string> = {
+  unpaid:
+    "bg-amber-400/15 text-amber-100 ring-amber-300/30",
+  paid: "bg-emerald-400/15 text-emerald-100 ring-emerald-300/30",
+  cancelled: "bg-red-400/15 text-red-100 ring-red-300/30",
+};
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString();
+}
 
 function Section({
   title,
@@ -75,7 +111,19 @@ function Row({
   );
 }
 
-export function GasBillDetailModal({ bill, onClose }: Props) {
+export function GasBillDetailModal({ bill, onClose, onOpenBill }: Props) {
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload() {
+    if (!bill || downloading) return;
+    setDownloading(true);
+    try {
+      await downloadBillPdf(bill);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   useEffect(() => {
     if (!bill) return;
     const prevOverflow = document.body.style.overflow;
@@ -124,8 +172,18 @@ export function GasBillDetailModal({ bill, onClose }: Props) {
               >
                 Gas Bill
               </h2>
-              <p className="mt-0.5 text-xs text-zinc-300">
-                Invoice #{bill.billId} &middot; {bill.billingDate}
+              <p className="mt-0.5 flex items-center gap-2 text-xs text-zinc-300">
+                <span>
+                  Invoice #{bill.billId} &middot;{" "}
+                  {formatBillDateTime(bill.billingDate)}
+                </span>
+                {bill.status ? (
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${STATUS_BADGE[bill.status]}`}
+                  >
+                    {bill.status}
+                  </span>
+                ) : null}
               </p>
             </div>
           </div>
@@ -181,6 +239,68 @@ export function GasBillDetailModal({ bill, onClose }: Props) {
             />
           </Section>
 
+          {bill.updateReason || bill.previousBillId || bill.supersededByBillId ? (
+            <Section title="Update history" icon={History}>
+              {bill.billUpdatedAt ? (
+                <Row label="Bill updated on" value={formatDateTime(bill.billUpdatedAt)} />
+              ) : null}
+              {bill.updateReason ? (
+                <div className="py-2.5 text-sm">
+                  <dt className="text-zinc-500 dark:text-zinc-400">Update reason</dt>
+                  <dd className="mt-1 whitespace-pre-wrap font-medium text-zinc-800 dark:text-zinc-100">
+                    {bill.updateReason}
+                  </dd>
+                </div>
+              ) : null}
+              {bill.previousBillId ? (
+                <div className="flex items-baseline justify-between gap-4 py-2.5 text-sm">
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    Previous bill (cancelled)
+                  </dt>
+                  <dd className="text-right font-medium">
+                    {onOpenBill ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenBill(bill.previousBillId as number)}
+                        className="text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+                      >
+                        #{bill.previousBillId}
+                        {bill.previousBillDate ? ` · ${bill.previousBillDate}` : ""}
+                      </button>
+                    ) : (
+                      <span className="text-zinc-800 dark:text-zinc-100">
+                        #{bill.previousBillId}
+                        {bill.previousBillDate ? ` · ${bill.previousBillDate}` : ""}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              ) : null}
+              {bill.supersededByBillId ? (
+                <div className="flex items-baseline justify-between gap-4 py-2.5 text-sm">
+                  <dt className="text-zinc-500 dark:text-zinc-400">
+                    Replaced by bill
+                  </dt>
+                  <dd className="text-right font-medium">
+                    {onOpenBill ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenBill(bill.supersededByBillId as number)}
+                        className="text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+                      >
+                        #{bill.supersededByBillId}
+                      </button>
+                    ) : (
+                      <span className="text-zinc-800 dark:text-zinc-100">
+                        #{bill.supersededByBillId}
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              ) : null}
+            </Section>
+          ) : null}
+
           <Section title="Meter image (at billing)" icon={ImageIcon}>
             <div className="py-3">
               {hasImage ? (
@@ -211,13 +331,28 @@ export function GasBillDetailModal({ bill, onClose }: Props) {
           <p className="text-xs text-zinc-400 dark:text-zinc-500">
             Bill #{bill.billId}
           </p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+            >
+              {downloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <Download className="h-4 w-4" aria-hidden />
+              )}
+              {downloading ? "Preparing…" : "Download PDF"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

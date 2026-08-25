@@ -5,6 +5,14 @@ import { AppShell } from "@/components/app-shell";
 import { useUserRole } from "@/hooks/use-user-role";
 import { adminFetch } from "@/lib/admin-client";
 import { getAdminNavForRole } from "@/lib/admin-nav";
+import {
+  billingAlertErr,
+  billingAlertOk,
+  billingButton,
+  billingH2,
+  billingInput,
+  billingSection,
+} from "@/lib/billing-ui";
 
 type Building = {
   id: number;
@@ -13,6 +21,7 @@ type Building = {
   address1: string;
   address2: string;
   postCode: string;
+  isActive?: number;
 };
 
 export default function BuildingsPage() {
@@ -95,17 +104,23 @@ export default function BuildingsPage() {
     }
   }
 
-  async function remove(id: number) {
-    if (editingId === id) cancelEdit();
+  async function toggleActive(b: Building) {
+    if (editingId === b.id) cancelEdit();
+    const nextActive = Number(b.isActive) === 1 ? 0 : 1;
+    const label = nextActive === 1 ? "enable" : "disable";
     const ok = window.confirm(
-      "Are you sure you want to delete this building? This action cannot be undone.",
+      `Are you sure you want to ${label} building "${b.name}"? The record will remain in the database.`,
     );
     if (!ok) return;
     try {
-      await adminFetch(`/admin/buildings/${id}`, { method: "DELETE" });
+      await adminFetch(`/admin/buildings/${b.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ isActive: nextActive }),
+      });
+      setMsg(`Building ${nextActive === 1 ? "enabled" : "disabled"}.`);
       await load();
     } catch (error) {
-      setErr(error instanceof Error ? error.message : "Delete failed.");
+      setErr(error instanceof Error ? error.message : "Failed to update building status.");
     }
   }
 
@@ -130,39 +145,32 @@ export default function BuildingsPage() {
       title="Building Management"
       subtitle="Only admin can create and manage buildings."
       menu={getAdminNavForRole(role)}
+      compact
     >
-      {err ? (
-        <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-200">
-          {err}
-        </section>
-      ) : null}
-      {msg ? (
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-200">
-          {msg}
-        </section>
-      ) : null}
+      {err ? <section className={billingAlertErr}>{err}</section> : null}
+      {msg ? <section className={billingAlertOk}>{msg}</section> : null}
 
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-4 font-semibold">{editingId === null ? "Add Building" : "Edit Building"}</h2>
-        <form className="grid gap-3 md:grid-cols-2" onSubmit={submitBuilding}>
-          <input className="rounded-md border border-zinc-300 p-2" placeholder="Building Name" value={form.name} onChange={(e) => setForm((v) => ({ ...v, name: e.target.value }))} required />
-          <input className="rounded-md border border-zinc-300 p-2" placeholder="Building No (Optional)" value={form.buildingNo} onChange={(e) => setForm((v) => ({ ...v, buildingNo: e.target.value }))} />
-          <input className="rounded-md border border-zinc-300 p-2" placeholder="Address-1" value={form.address1} onChange={(e) => setForm((v) => ({ ...v, address1: e.target.value }))} required />
-          <input className="rounded-md border border-zinc-300 p-2" placeholder="Address-2" value={form.address2} onChange={(e) => setForm((v) => ({ ...v, address2: e.target.value }))} required />
-          <input className="rounded-md border border-zinc-300 p-2 md:col-span-2" placeholder="Post Code" value={form.postCode} onChange={(e) => setForm((v) => ({ ...v, postCode: e.target.value }))} required />
+      <section className={billingSection}>
+        <h2 className={billingH2}>{editingId === null ? "Add Building" : "Edit Building"}</h2>
+        <form className="grid gap-2 md:grid-cols-3" onSubmit={submitBuilding}>
+          <input className={billingInput} placeholder="Building Name" value={form.name} onChange={(e) => setForm((v) => ({ ...v, name: e.target.value }))} required />
+          <input className={billingInput} placeholder="Building No (Optional)" value={form.buildingNo} onChange={(e) => setForm((v) => ({ ...v, buildingNo: e.target.value }))} />
+          <input className={billingInput} placeholder="Post Code" value={form.postCode} onChange={(e) => setForm((v) => ({ ...v, postCode: e.target.value }))} required />
+          <input className={billingInput} placeholder="Address-1" value={form.address1} onChange={(e) => setForm((v) => ({ ...v, address1: e.target.value }))} required />
+          <input className={`${billingInput} md:col-span-2`} placeholder="Address-2" value={form.address2} onChange={(e) => setForm((v) => ({ ...v, address2: e.target.value }))} required />
           {editingId === null ? (
-            <button className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white md:col-span-2">
+            <button className={`${billingButton} md:col-span-3`}>
               Save Building
             </button>
           ) : (
-            <div className="md:col-span-2 flex gap-3">
-              <button className="flex-1 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white">
+            <div className="flex gap-2 md:col-span-3">
+              <button className={`${billingButton} flex-1`}>
                 Update Building
               </button>
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-900 dark:border-zinc-700 dark:text-zinc-100"
+                className="rounded border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-900 dark:border-zinc-700 dark:text-zinc-100"
               >
                 Cancel
               </button>
@@ -171,28 +179,40 @@ export default function BuildingsPage() {
         </form>
       </section>
 
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-4 font-semibold">Building List</h2>
+      <section className={billingSection}>
+        <h2 className={billingH2}>Building List</h2>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+          <table className="min-w-full text-xs">
             <thead>
               <tr className="border-b border-zinc-200 text-left">
-                <th><button onClick={() => toggleSort("name")} className="font-semibold">Name</button></th>
-                <th><button onClick={() => toggleSort("buildingNo")} className="font-semibold">No</button></th>
-                <th>Address</th>
-                <th><button onClick={() => toggleSort("postCode")} className="font-semibold">Post Code</button></th>
-                <th className="w-[140px]" />
+                <th className="py-1.5 pr-2"><button onClick={() => toggleSort("name")} className="font-semibold">Name</button></th>
+                <th className="py-1.5 pr-2"><button onClick={() => toggleSort("buildingNo")} className="font-semibold">No</button></th>
+                <th className="py-1.5 pr-2">Address</th>
+                <th className="py-1.5 pr-2"><button onClick={() => toggleSort("postCode")} className="font-semibold">Post Code</button></th>
+                <th className="py-1.5 pr-2">Status</th>
+                <th className="w-[140px] py-1.5" />
               </tr>
             </thead>
             <tbody>
               {sortedRows.map((b) => (
                 <tr key={b.id} className="border-b border-zinc-100">
-                  <td className="py-2">{b.name}</td>
-                  <td>{b.buildingNo ?? "-"}</td>
-                  <td>{b.address1}, {b.address2}</td>
-                  <td>{b.postCode}</td>
-                  <td>
-                    <div className="flex gap-3">
+                  <td className="py-1.5 pr-2">{b.name}</td>
+                  <td className="py-1.5 pr-2">{b.buildingNo ?? "-"}</td>
+                  <td className="py-1.5 pr-2">{b.address1}, {b.address2}</td>
+                  <td className="py-1.5 pr-2">{b.postCode}</td>
+                  <td className="py-1.5 pr-2">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                        Number(b.isActive) === 1
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                          : "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                      }`}
+                    >
+                      {Number(b.isActive) === 1 ? "Enabled" : "Disabled"}
+                    </span>
+                  </td>
+                  <td className="py-1.5">
+                    <div className="flex gap-2">
                       <button
                         className="text-blue-600"
                         onClick={() => startEdit(b)}
@@ -200,10 +220,12 @@ export default function BuildingsPage() {
                         Edit
                       </button>
                       <button
-                        className="text-red-600"
-                        onClick={() => void remove(b.id)}
+                        className={
+                          Number(b.isActive) === 1 ? "text-amber-700" : "text-emerald-700"
+                        }
+                        onClick={() => void toggleActive(b)}
                       >
-                        Delete
+                        {Number(b.isActive) === 1 ? "Disable" : "Enable"}
                       </button>
                     </div>
                   </td>

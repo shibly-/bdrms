@@ -70,10 +70,13 @@ export class AdminController {
     return this.adminService.updateBuilding(id, body);
   }
 
-  @Delete('buildings/:id')
+  @Patch('buildings/:id/status')
   @Roles(UserRole.Admin)
-  deleteBuilding(@Param('id', ParseIntPipe) id: number) {
-    return this.adminService.deleteBuilding(id);
+  setBuildingStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { isActive: number },
+  ) {
+    return this.adminService.setBuildingActive(id, Number(body.isActive) === 1);
   }
 
   @Get('flats')

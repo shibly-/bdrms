@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { DRIZZLE } from '../database/database.module';
 import * as schema from '../database/schema';
@@ -52,6 +52,7 @@ export class AuthService {
         postCode: schema.buildings.postCode,
       })
       .from(schema.buildings)
+      .where(eq(schema.buildings.isActive, 1))
       .orderBy(schema.buildings.name);
   }
 
@@ -186,27 +187,54 @@ export class AuthService {
     };
   }
 
-  async getResidentProfile(userId: number) {
-    if (!Number.isFinite(userId) || userId < 1) {
-      throw new NotFoundException('User not found');
-    }
+  async getResidentProfile(userId: number, userName?: string | null) {
+    const userColumns = {
+      id: schema.users.id,
+      userName: schema.users.userName,
+      fullName: schema.users.fullName,
+      phone: schema.users.phone,
+      email: schema.users.email,
+      role: schema.users.role,
+      isActive: schema.users.isActive,
+      createdAt: schema.users.createdAt,
+    };
 
-    const [user] = await this.db
-      .select({
-        id: schema.users.id,
-        userName: schema.users.userName,
-        fullName: schema.users.fullName,
-        phone: schema.users.phone,
-        email: schema.users.email,
-        role: schema.users.role,
-        isActive: schema.users.isActive,
-        createdAt: schema.users.createdAt,
-      })
-      .from(schema.users)
-      .where(
-        and(eq(schema.users.id, userId), eq(schema.users.role, UserRole.User)),
-      )
-      .limit(1);
+    const byId =
+      Number.isFinite(userId) && userId >= 1
+        ? await this.db
+            .select(userColumns)
+            .from(schema.users)
+            .where(
+              and(
+                eq(schema.users.id, userId),
+                eq(schema.users.role, UserRole.User),
+              ),
+            )
+            .limit(1)
+        : [];
+
+    let user = byId[0];
+
+    // Fall back to a case-insensitive username lookup. This keeps the profile
+    // working for sessions whose token lacks a usable `sub` (e.g. tokens issued
+    // before the account existed, or the demo login fallback).
+    const trimmedUserName = userName?.trim();
+    if (!user && trimmedUserName) {
+      const byName = await this.db
+        .select(userColumns)
+        .from(schema.users)
+        .where(
+          and(
+            eq(
+              sql`lower(${schema.users.userName})`,
+              trimmedUserName.toLowerCase(),
+            ),
+            eq(schema.users.role, UserRole.User),
+          ),
+        )
+        .limit(1);
+      user = byName[0];
+    }
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -222,7 +250,7 @@ export class AuthService {
         activationDate: schema.standardUserProfiles.activationDate,
       })
       .from(schema.standardUserProfiles)
-      .where(eq(schema.standardUserProfiles.userId, userId))
+      .where(eq(schema.standardUserProfiles.userId, user.id))
       .limit(1);
 
     if (!prof) {
@@ -272,7 +300,7 @@ export class AuthService {
         passwordHash: schema.users.passwordHash,
       })
       .from(schema.users)
-      .where(eq(schema.users.userName, userName))
+      .where(eq(sql`lower(${schema.users.userName})`, userName.toLowerCase()))
       .limit(1);
 
     const row = rows[0];

@@ -22,12 +22,13 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.User)
-  me(@Req() req: { user?: { sub?: number } }) {
+  me(@Req() req: { user?: { sub?: number; userName?: string } }) {
     const userId = req.user?.sub;
-    if (userId == null || !Number.isFinite(userId)) {
+    const userName = req.user?.userName;
+    if ((userId == null || !Number.isFinite(userId)) && !userName) {
       throw new UnauthorizedException('Invalid session');
     }
-    return this.authService.getResidentProfile(userId);
+    return this.authService.getResidentProfile(userId ?? 0, userName);
   }
 
   @Get('buildings')

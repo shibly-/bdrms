@@ -1,14 +1,22 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import Tesseract from "tesseract.js";
 import { AppShell } from "@/components/app-shell";
 import { useUserRole } from "@/hooks/use-user-role";
 import { adminFetch } from "@/lib/admin-client";
 import { getAdminNavForRole } from "@/lib/admin-nav";
-import { compressMeterImageToDataUrl } from "@/lib/meter-image";
+import {
+  billingAlertErr,
+  billingAlertOk,
+  billingButton,
+  billingH2,
+  billingInput,
+  billingInputReadonly,
+  billingLabel,
+  billingSection,
+} from "@/lib/billing-ui";
 
-type Building = { id: number; name: string; buildingNo: string | null };
+type Building = { id: number; name: string; buildingNo: string | null; isActive?: number };
 type Flat = { id: number; flatNo: string; buildingId: number };
 type FlatContext = {
   standardUserId: number;
@@ -36,16 +44,14 @@ export default function GasBillingFormPage() {
   const [ctx, setCtx] = useState<FlatContext | null>(null);
   const [readingDate, setReadingDate] = useState(new Date().toISOString().slice(0, 10));
   const [currentReading, setCurrentReading] = useState<string>("");
-  /** JPEG data URL persisted with the bill; also used for preview */
-  const [meterImageDataUrl, setMeterImageDataUrl] = useState<string>("");
-  const [scanBusy, setScanBusy] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
   useEffect(() => {
     void adminFetch<Building[]>("/admin/buildings")
       .then((data) => {
-        setBuildings(data);
+        setBuildings(data.filter((b) => Number(b.isActive ?? 1) === 1));
       })
       .catch((e) => setErr(e instanceof Error ? e.message : "Failed to load buildings."));
   }, []);
@@ -54,7 +60,6 @@ export default function GasBillingFormPage() {
     setCtx(null);
     setCurrentReading("");
     setFlatId("");
-    setMeterImageDataUrl("");
     if (!buildingId) {
       setFlats([]);
       return;
@@ -67,14 +72,18 @@ export default function GasBillingFormPage() {
   }, [buildingId]);
 
   useEffect(() => {
-    setMeterImageDataUrl("");
-    if (!flatId) return;
+    if (!flatId) {
+      setCurrentReading("");
+      return;
+    }
     void adminFetch<FlatContext>(`/billing/flat-context?flatId=${flatId}`)
       .then((data) => {
         setCtx(data);
+        setCurrentReading(String(data.previousReading ?? 0));
       })
       .catch((e) => {
         setCtx(null);
+        setCurrentReading("");
         setErr(e instanceof Error ? e.message : "Failed to load user details for flat.");
       });
   }, [flatId]);
@@ -83,37 +92,21 @@ export default function GasBillingFormPage() {
   const unitPrice = ctx?.unitPrice ?? 0;
   const operatingCostPerFlat = ctx?.operatingCostPerFlat ?? 0;
   const currentNumeric = Number(currentReading || "0");
+  const readingIncreased = Number.isFinite(currentNumeric) && currentNumeric > previousReading;
   const usageQuantity = useMemo(() => Math.max(0, currentNumeric - previousReading), [currentNumeric, previousReading]);
   const usageQuantityKg = useMemo(() => usageQuantity * 1.8315, [usageQuantity]);
   const totalBill = useMemo(() => usageQuantityKg * unitPrice + operatingCostPerFlat, [usageQuantityKg, unitPrice, operatingCostPerFlat]);
 
-  async function scanFromImage(file: File) {
-    setScanBusy(true);
-    setErr("");
-    setMsg("");
-    try {
-      const dataUrl = await compressMeterImageToDataUrl(file);
-      setMeterImageDataUrl(dataUrl);
-      const result = await Tesseract.recognize(file, "eng");
-      const text = result.data.text ?? "";
-      const matches = text.match(/\d+(?:\.\d+)?/g);
-      if (!matches || matches.length === 0) {
-        setErr("No meter digits detected. Please enter Current Reading manually.");
-        return;
-      }
-      setCurrentReading(matches[matches.length - 1]);
-      setMsg("Current Reading populated from scanned image. You can still edit it.");
-    } catch {
-      setErr("Image scan failed. Please enter Current Reading manually.");
-    } finally {
-      setScanBusy(false);
-    }
-  }
-
   async function submitBill(e: FormEvent) {
     e.preventDefault();
-    if (!flatId) return;
+    if (!flatId || busy) return;
+    if (!readingIncreased) {
+      setErr("Current reading must be greater than previous reading.");
+      setMsg("");
+      return;
+    }
     try {
+      setBusy(true);
       setErr("");
       setMsg("");
       const created = await adminFetch<{ billId: number; totalBill: number }>("/billing/generate", {
@@ -122,41 +115,34 @@ export default function GasBillingFormPage() {
           flatId,
           billingDate: readingDate,
           currentReading: currentNumeric,
-          ocrImageUrl: meterImageDataUrl || undefined,
         }),
       });
       setMsg(`Gas bill created successfully. Bill ID: ${created.billId}`);
-      setCurrentReading("");
-      setMeterImageDataUrl("");
       const refreshed = await adminFetch<FlatContext>(`/billing/flat-context?flatId=${flatId}`);
       setCtx(refreshed);
+      setCurrentReading(String(refreshed.previousReading ?? 0));
     } catch (error) {
       setErr(error instanceof Error ? error.message : "Failed to create gas bill.");
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <AppShell
       title="Gas Billing Form"
-      subtitle="Generate gas bills with scanner-assisted current reading."
+      subtitle="Generate gas bills for a selected building and flat."
       menu={getAdminNavForRole(role)}
+      compact
     >
-      {err ? (
-        <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-200">
-          {err}
-        </section>
-      ) : null}
-      {msg ? (
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-200">
-          {msg}
-        </section>
-      ) : null}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-4 font-semibold">Gas Billing Form</h2>
-        <form className="grid gap-3 md:grid-cols-2" onSubmit={submitBill}>
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">
+      {err ? <section className={billingAlertErr}>{err}</section> : null}
+      {msg ? <section className={billingAlertOk}>{msg}</section> : null}
+      <section className={billingSection}>
+        <h2 className={billingH2}>Gas Billing Form</h2>
+        <form className="grid gap-2 md:grid-cols-3" onSubmit={submitBill}>
+          <label className={billingLabel}>
             Building No
-            <select className="mt-1 w-full rounded-md border border-zinc-300 p-2" value={buildingId} onChange={(e) => setBuildingId(Number(e.target.value) || "")} required>
+            <select className={billingInput} value={buildingId} onChange={(e) => setBuildingId(Number(e.target.value) || "")} required>
               <option value="">Select Building</option>
               {buildings.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -165,62 +151,40 @@ export default function GasBillingFormPage() {
               ))}
             </select>
           </label>
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">
+          <label className={billingLabel}>
             Flat No
-            <select className="mt-1 w-full rounded-md border border-zinc-300 p-2" value={flatId} onChange={(e) => setFlatId(Number(e.target.value) || "")} required>
+            <select className={billingInput} value={flatId} onChange={(e) => setFlatId(Number(e.target.value) || "")} required>
               <option value="">Select Flat</option>
               {flats.map((f) => (
                 <option key={f.id} value={f.id}>{f.flatNo}</option>
               ))}
             </select>
           </label>
-
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">User Name<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={ctx?.userName ?? ""} readOnly /></label>
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">Full Name<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={ctx?.fullName ?? ""} readOnly /></label>
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">Phone No<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={ctx?.phone ?? ""} readOnly /></label>
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">Email<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={ctx?.email ?? ""} readOnly /></label>
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">Gas Meter No<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={ctx?.gasMeterNo ?? ""} readOnly /></label>
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">Gas Meter Reading Date<input type="date" className="mt-1 w-full rounded-md border border-zinc-300 p-2" value={readingDate} onChange={(e) => setReadingDate(e.target.value)} required /></label>
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">Previous Reading (m³)<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={previousReading} readOnly /></label>
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">Current Reading (m³)
+          <label className={billingLabel}>User Name<input className={billingInputReadonly} value={ctx?.userName ?? ""} readOnly /></label>
+          <label className={billingLabel}>Full Name<input className={billingInputReadonly} value={ctx?.fullName ?? ""} readOnly /></label>
+          <label className={billingLabel}>Phone No<input className={billingInputReadonly} value={ctx?.phone ?? ""} readOnly /></label>
+          <label className={billingLabel}>Email<input className={billingInputReadonly} value={ctx?.email ?? ""} readOnly /></label>
+          <label className={billingLabel}>Gas Meter No<input className={billingInputReadonly} value={ctx?.gasMeterNo ?? ""} readOnly /></label>
+          <label className={billingLabel}>Gas Meter Reading Date<input type="date" className={billingInput} value={readingDate} onChange={(e) => setReadingDate(e.target.value)} required /></label>
+          <label className={billingLabel}>Previous Reading (m³)<input className={billingInputReadonly} value={previousReading} readOnly /></label>
+          <label className={billingLabel}>Current Reading (m³)
             <input
               type="number"
               step="0.001"
-              min="0"
-              className="mt-1 w-full rounded-md border border-zinc-300 p-2"
+              min={previousReading}
+              className={billingInput}
               value={currentReading}
               onChange={(e) => setCurrentReading(e.target.value)}
               required
             />
           </label>
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">Usage Quantity (m³)<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={usageQuantity.toFixed(3)} readOnly /></label>
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">Usage Quantity (kg)<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={usageQuantityKg.toFixed(3)} readOnly /></label>
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">Operating Cost Per Flat<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={operatingCostPerFlat.toFixed(2)} readOnly /></label>
-          <label className="text-sm text-zinc-700 dark:text-zinc-300">Total Bill<input className="mt-1 w-full rounded-md border border-zinc-300 bg-zinc-50 p-2" value={totalBill.toFixed(2)} readOnly /></label>
+          <label className={billingLabel}>Usage Quantity (m³)<input className={billingInputReadonly} value={usageQuantity.toFixed(3)} readOnly /></label>
+          <label className={billingLabel}>Usage Quantity (kg)<input className={billingInputReadonly} value={usageQuantityKg.toFixed(3)} readOnly /></label>
+          <label className={billingLabel}>Operating Cost Per Flat<input className={billingInputReadonly} value={operatingCostPerFlat.toFixed(2)} readOnly /></label>
+          <label className={billingLabel}>Total Bill<input className={billingInputReadonly} value={totalBill.toFixed(2)} readOnly /></label>
 
-          <label className="md:col-span-2 rounded-md border border-zinc-300 p-3 text-sm text-zinc-700 dark:border-zinc-700 dark:text-zinc-300">
-            Capture Meter Image (Camera) / Upload Image
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="mt-2 block w-full"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void scanFromImage(file);
-              }}
-            />
-            <span className="mt-1 block text-xs text-zinc-500">
-              Captured image is scanned to fill Current Reading. The same image is stored with the bill for future reference (billing history).
-            </span>
-            {meterImageDataUrl ? (
-              <img src={meterImageDataUrl} alt="Captured gas meter" className="mt-2 h-28 max-w-full rounded-md border border-zinc-300 object-contain" />
-            ) : null}
-            {scanBusy ? <span className="mt-1 block text-xs">Scanning image and reading meter digits...</span> : null}
-          </label>
-
-          <button className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white md:col-span-2" disabled={scanBusy}>
-            Generate Bill
+          <button className={`${billingButton} md:col-span-3`} disabled={busy || !readingIncreased}>
+            {busy ? "Generating…" : "Generate Bill"}
           </button>
         </form>
       </section>

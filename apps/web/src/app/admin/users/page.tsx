@@ -5,6 +5,18 @@ import { AppShell } from "@/components/app-shell";
 import { useUserRole } from "@/hooks/use-user-role";
 import { adminFetch } from "@/lib/admin-client";
 import { getAdminNavForRole } from "@/lib/admin-nav";
+import {
+  billingAlertErr,
+  billingAlertOk,
+  billingButton,
+  billingH2,
+  billingInput,
+  billingInputReadonly,
+  billingSection,
+  compactTab,
+  compactTabActive,
+  compactTabIdle,
+} from "@/lib/billing-ui";
 
 type Building = { id: number; name: string; address1: string; address2: string; postCode: string };
 type Flat = { id: number; flatNo: string; buildingId: number };
@@ -217,37 +229,30 @@ export default function StandardUsersPage() {
       title="Standard User Management"
       subtitle="Only admin can create and manage standard users."
       menu={getAdminNavForRole(role)}
+      compact
     >
-      {err ? (
-        <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-200">
-          {err}
-        </section>
-      ) : null}
-      {msg ? (
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-200">
-          {msg}
-        </section>
-      ) : null}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mb-4 flex flex-wrap gap-2 border-b border-zinc-200 pb-3 dark:border-zinc-800">
+      {err ? <section className={billingAlertErr}>{err}</section> : null}
+      {msg ? <section className={billingAlertOk}>{msg}</section> : null}
+      <section className={billingSection}>
+        <div className="mb-2 flex flex-wrap gap-1.5 border-b border-zinc-200 pb-2 dark:border-zinc-800">
           <button
             type="button"
             onClick={() => setActiveTab("list")}
-            className={`rounded-md px-3 py-1.5 text-sm ${activeTab === "list" ? "bg-zinc-900 text-white" : "border border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"}`}
+            className={`${compactTab} ${activeTab === "list" ? compactTabActive : compactTabIdle}`}
           >
             Standard Users
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("form")}
-            className={`rounded-md px-3 py-1.5 text-sm ${activeTab === "form" ? "bg-zinc-900 text-white" : "border border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"}`}
+            className={`${compactTab} ${activeTab === "form" ? compactTabActive : compactTabIdle}`}
           >
             Add Standard User
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("history")}
-            className={`rounded-md px-3 py-1.5 text-sm ${activeTab === "history" ? "bg-zinc-900 text-white" : "border border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"}`}
+            className={`${compactTab} ${activeTab === "history" ? compactTabActive : compactTabIdle}`}
           >
             Billing History with Filters
           </button>
@@ -255,68 +260,70 @@ export default function StandardUsersPage() {
 
         {activeTab === "list" ? (
           <>
-            <h2 className="mb-4 font-semibold">Standard Users</h2>
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-200 text-left">
-                  <th><button onClick={() => toggleSort("userName")} className="font-semibold">User Name</button></th>
-                  <th><button onClick={() => toggleSort("fullName")} className="font-semibold">Full Name</button></th>
-                  <th><button onClick={() => toggleSort("phone")} className="font-semibold">Phone No</button></th>
-                  <th><button onClick={() => toggleSort("flatNo")} className="font-semibold">Flat No</button></th>
-                  <th><button onClick={() => toggleSort("buildingName")} className="font-semibold">Building Name</button></th>
-                  <th><button onClick={() => toggleSort("gasMeterNo")} className="font-semibold">Gas Meter No</button></th>
-                  <th className="w-[140px]" />
-                </tr>
-              </thead>
-              <tbody>
-                {sortedRows.map((u) => (
-                  <tr key={u.id} className="border-b border-zinc-100">
-                    <td className="py-2">{u.userName}</td>
-                    <td>{u.fullName}</td>
-                    <td>{u.phone || "-"}</td>
-                    <td>{u.profile?.flatId ? (flatById.get(u.profile.flatId) ?? "-") : "-"}</td>
-                    <td>{u.profile?.buildingId ? (buildingById.get(u.profile.buildingId) ?? "-") : "-"}</td>
-                    <td>{u.profile?.gasMeterNo ?? "-"}</td>
-                    <td>
-                      <div className="flex gap-3">
-                        <button className="text-blue-600" onClick={() => startEdit(u)}>Edit</button>
-                        <button className="text-red-600" onClick={() => void removeUser(u.id)}>Delete</button>
-                      </div>
-                    </td>
+            <h2 className={billingH2}>Standard Users</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead>
+                  <tr className="border-b border-zinc-200 text-left">
+                    <th className="py-1.5 pr-2"><button onClick={() => toggleSort("userName")} className="font-semibold">User Name</button></th>
+                    <th className="py-1.5 pr-2"><button onClick={() => toggleSort("fullName")} className="font-semibold">Full Name</button></th>
+                    <th className="py-1.5 pr-2"><button onClick={() => toggleSort("phone")} className="font-semibold">Phone No</button></th>
+                    <th className="py-1.5 pr-2"><button onClick={() => toggleSort("flatNo")} className="font-semibold">Flat No</button></th>
+                    <th className="py-1.5 pr-2"><button onClick={() => toggleSort("buildingName")} className="font-semibold">Building Name</button></th>
+                    <th className="py-1.5 pr-2"><button onClick={() => toggleSort("gasMeterNo")} className="font-semibold">Gas Meter No</button></th>
+                    <th className="w-[140px] py-1.5" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {sortedRows.map((u) => (
+                    <tr key={u.id} className="border-b border-zinc-100">
+                      <td className="py-1.5 pr-2">{u.userName}</td>
+                      <td className="py-1.5 pr-2">{u.fullName}</td>
+                      <td className="py-1.5 pr-2">{u.phone || "-"}</td>
+                      <td className="py-1.5 pr-2">{u.profile?.flatId ? (flatById.get(u.profile.flatId) ?? "-") : "-"}</td>
+                      <td className="py-1.5 pr-2">{u.profile?.buildingId ? (buildingById.get(u.profile.buildingId) ?? "-") : "-"}</td>
+                      <td className="py-1.5 pr-2">{u.profile?.gasMeterNo ?? "-"}</td>
+                      <td className="py-1.5">
+                        <div className="flex gap-2">
+                          <button className="text-blue-600" onClick={() => startEdit(u)}>Edit</button>
+                          <button className="text-red-600" onClick={() => void removeUser(u.id)}>Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         ) : null}
 
         {activeTab === "form" ? (
           <>
-            <h2 className="mb-4 font-semibold">{editingId === null ? "Add Standard User" : "Edit Standard User"}</h2>
-            <form className="grid gap-3 md:grid-cols-2" onSubmit={createUser}>
-              <input className="rounded-md border border-zinc-300 p-2" placeholder="User Name" value={form.userName} onChange={(e) => setForm((v) => ({ ...v, userName: e.target.value }))} required />
-              <input className="rounded-md border border-zinc-300 p-2" placeholder="Full Name" value={form.fullName} onChange={(e) => setForm((v) => ({ ...v, fullName: e.target.value }))} required />
-              <input className="rounded-md border border-zinc-300 p-2" placeholder="Phone No" value={form.phone} onChange={(e) => setForm((v) => ({ ...v, phone: e.target.value }))} />
-              <input type="email" className="rounded-md border border-zinc-300 p-2" placeholder="Email" value={form.email} onChange={(e) => setForm((v) => ({ ...v, email: e.target.value }))} />
-              <input type="password" className="rounded-md border border-zinc-300 p-2" placeholder="Password" value={form.password} onChange={(e) => setForm((v) => ({ ...v, password: e.target.value }))} required minLength={8} />
-              <select className="rounded-md border border-zinc-300 p-2" value={buildingId} onChange={(e) => setBuildingId(Number(e.target.value) || "")} required>
+            <h2 className={billingH2}>{editingId === null ? "Add Standard User" : "Edit Standard User"}</h2>
+            <form className="grid gap-2 md:grid-cols-3" onSubmit={createUser}>
+              <input className={billingInput} placeholder="User Name" value={form.userName} onChange={(e) => setForm((v) => ({ ...v, userName: e.target.value }))} required />
+              <input className={billingInput} placeholder="Full Name" value={form.fullName} onChange={(e) => setForm((v) => ({ ...v, fullName: e.target.value }))} required />
+              <input className={billingInput} placeholder="Phone No" value={form.phone} onChange={(e) => setForm((v) => ({ ...v, phone: e.target.value }))} />
+              <input type="email" className={billingInput} placeholder="Email" value={form.email} onChange={(e) => setForm((v) => ({ ...v, email: e.target.value }))} />
+              <input type="password" className={billingInput} placeholder="Password" value={form.password} onChange={(e) => setForm((v) => ({ ...v, password: e.target.value }))} required minLength={8} />
+              <select className={billingInput} value={buildingId} onChange={(e) => setBuildingId(Number(e.target.value) || "")} required>
                 {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
-              <select className="rounded-md border border-zinc-300 p-2" value={flatId} onChange={(e) => setFlatId(Number(e.target.value) || "")} required>
+              <select className={billingInput} value={flatId} onChange={(e) => setFlatId(Number(e.target.value) || "")} required>
                 {flats.map((f) => <option key={f.id} value={f.id}>{f.flatNo}</option>)}
               </select>
-              <input className="rounded-md border border-zinc-300 bg-zinc-50 p-2" value={selectedBuilding?.address1 ?? ""} readOnly placeholder="Address-1" />
-              <input className="rounded-md border border-zinc-300 bg-zinc-50 p-2" value={selectedBuilding?.address2 ?? ""} readOnly placeholder="Address-2" />
-              <input className="rounded-md border border-zinc-300 bg-zinc-50 p-2" value={selectedBuilding?.postCode ?? ""} readOnly placeholder="Post Code" />
-              <input className="rounded-md border border-zinc-300 p-2" placeholder="Gas Meter No" value={form.gasMeterNo} onChange={(e) => setForm((v) => ({ ...v, gasMeterNo: e.target.value }))} required />
-              <input type="date" className="rounded-md border border-zinc-300 p-2" value={form.installationDate} onChange={(e) => setForm((v) => ({ ...v, installationDate: e.target.value }))} />
-              <input type="date" className="rounded-md border border-zinc-300 p-2" value={form.activationDate} onChange={(e) => setForm((v) => ({ ...v, activationDate: e.target.value }))} />
+              <input className={billingInputReadonly} value={selectedBuilding?.address1 ?? ""} readOnly placeholder="Address-1" />
+              <input className={billingInputReadonly} value={selectedBuilding?.address2 ?? ""} readOnly placeholder="Address-2" />
+              <input className={billingInputReadonly} value={selectedBuilding?.postCode ?? ""} readOnly placeholder="Post Code" />
+              <input className={billingInput} placeholder="Gas Meter No" value={form.gasMeterNo} onChange={(e) => setForm((v) => ({ ...v, gasMeterNo: e.target.value }))} required />
+              <input type="date" className={billingInput} value={form.installationDate} onChange={(e) => setForm((v) => ({ ...v, installationDate: e.target.value }))} />
+              <input type="date" className={billingInput} value={form.activationDate} onChange={(e) => setForm((v) => ({ ...v, activationDate: e.target.value }))} />
               {editingId === null ? (
-                <button className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white md:col-span-2">Save Standard User</button>
+                <button className={`${billingButton} md:col-span-3`}>Save Standard User</button>
               ) : (
-                <div className="md:col-span-2 flex gap-3">
-                  <button className="flex-1 rounded-md bg-zinc-900 px-4 py-2 text-sm text-white">Update Standard User</button>
-                  <button type="button" onClick={cancelEdit} className="rounded-md border border-zinc-300 px-4 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:text-zinc-100">Cancel</button>
+                <div className="flex gap-2 md:col-span-3">
+                  <button className={`${billingButton} flex-1`}>Update Standard User</button>
+                  <button type="button" onClick={cancelEdit} className="rounded border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-900 dark:border-zinc-700 dark:text-zinc-100">Cancel</button>
                 </div>
               )}
             </form>
@@ -325,30 +332,30 @@ export default function StandardUsersPage() {
 
         {activeTab === "history" ? (
           <div id="billing-history">
-            <h2 className="mb-4 font-semibold">Billing History with Filters</h2>
-            <form className="grid gap-3 md:grid-cols-4" onSubmit={loadHistory}>
-              <input type="month" className="rounded-md border border-zinc-300 p-2" value={filters.month} onChange={(e) => setFilters((v) => ({ ...v, month: e.target.value }))} />
-              <input className="rounded-md border border-zinc-300 p-2" placeholder="User Name" value={filters.userName} onChange={(e) => setFilters((v) => ({ ...v, userName: e.target.value }))} />
-              <input className="rounded-md border border-zinc-300 p-2" placeholder="Gas Meter No" value={filters.gasMeterNo} onChange={(e) => setFilters((v) => ({ ...v, gasMeterNo: e.target.value }))} />
-              <button className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white">Apply Filters</button>
+            <h2 className={billingH2}>Billing History with Filters</h2>
+            <form className="grid gap-2 md:grid-cols-4" onSubmit={loadHistory}>
+              <input type="month" className={billingInput} value={filters.month} onChange={(e) => setFilters((v) => ({ ...v, month: e.target.value }))} />
+              <input className={billingInput} placeholder="User Name" value={filters.userName} onChange={(e) => setFilters((v) => ({ ...v, userName: e.target.value }))} />
+              <input className={billingInput} placeholder="Gas Meter No" value={filters.gasMeterNo} onChange={(e) => setFilters((v) => ({ ...v, gasMeterNo: e.target.value }))} />
+              <button className={billingButton}>Apply Filters</button>
             </form>
-            <div className="mt-3 overflow-x-auto">
-              <table className="min-w-full text-sm">
+            <div className="mt-2 overflow-x-auto">
+              <table className="min-w-full text-xs">
                 <thead>
                   <tr className="border-b border-zinc-200 text-left">
-                    <th><button onClick={() => toggleHistorySort("billingDate")} className="font-semibold">Date</button></th>
-                    <th><button onClick={() => toggleHistorySort("userName")} className="font-semibold">User</button></th>
-                    <th><button onClick={() => toggleHistorySort("gasMeterNo")} className="font-semibold">Meter</button></th>
-                    <th><button onClick={() => toggleHistorySort("totalBill")} className="font-semibold">Total Bill</button></th>
+                    <th className="py-1.5 pr-2"><button onClick={() => toggleHistorySort("billingDate")} className="font-semibold">Date</button></th>
+                    <th className="py-1.5 pr-2"><button onClick={() => toggleHistorySort("userName")} className="font-semibold">User</button></th>
+                    <th className="py-1.5 pr-2"><button onClick={() => toggleHistorySort("gasMeterNo")} className="font-semibold">Meter</button></th>
+                    <th className="py-1.5 pr-2"><button onClick={() => toggleHistorySort("totalBill")} className="font-semibold">Total Bill</button></th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedHistory.map((b) => (
                     <tr key={b.billId} className="border-b border-zinc-100">
-                      <td className="py-2">{b.billingDate}</td>
-                      <td>{b.fullName} ({b.userName})</td>
-                      <td>{b.gasMeterNo}</td>
-                      <td>{b.totalBill}</td>
+                      <td className="py-1.5 pr-2">{b.billingDate}</td>
+                      <td className="py-1.5 pr-2">{b.fullName} ({b.userName})</td>
+                      <td className="py-1.5 pr-2">{b.gasMeterNo}</td>
+                      <td className="py-1.5 pr-2">{b.totalBill}</td>
                     </tr>
                   ))}
                 </tbody>

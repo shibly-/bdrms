@@ -11,6 +11,14 @@ import {
   type GasBillDetailRow,
 } from "@/components/gas-bill-detail-modal";
 import { adminFetch } from "@/lib/admin-client";
+import { downloadBillingHistoryCsv } from "@/lib/billing-history-csv";
+import {
+  billingAlertErr,
+  billingButton,
+  billingH2,
+  billingInput,
+  billingSection,
+} from "@/lib/billing-ui";
 
 type BillingRow = GasBillDetailRow;
 
@@ -26,8 +34,9 @@ export default function ResidentGasBillingHistoryPage() {
     e?.preventDefault();
     try {
       setErr("");
-      const params = new URLSearchParams(month ? { month } : {}).toString();
-      const res = await adminFetch<{ items: BillingRow[] }>(`/billing/history?${params}`);
+      const params = new URLSearchParams(month ? { month } : {});
+      params.set("status", "paid,cancelled");
+      const res = await adminFetch<{ items: BillingRow[] }>(`/billing/history?${params.toString()}`);
       setRows(res.items ?? []);
     } catch (error) {
       setErr(error instanceof Error ? error.message : "Failed to load billing history.");
@@ -45,10 +54,16 @@ export default function ResidentGasBillingHistoryPage() {
 
   const sortedRows = useMemo(() => {
     return [...rows].sort((a, b) => {
-      const cmp =
-        sortKey === "totalBill"
-          ? Number(a.totalBill) - Number(b.totalBill)
-          : String(a[sortKey] ?? "").localeCompare(String(b[sortKey] ?? ""));
+      let cmp: number;
+      if (sortKey === "billId") {
+        cmp = a.billId - b.billId;
+      } else if (sortKey === "totalBill") {
+        cmp = Number(a.totalBill) - Number(b.totalBill);
+      } else if (sortKey === "billingDate") {
+        cmp = String(a.billingDate).localeCompare(String(b.billingDate));
+      } else {
+        cmp = String(a[sortKey] ?? "").localeCompare(String(b[sortKey] ?? ""));
+      }
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [rows, sortKey, sortDir]);
@@ -62,23 +77,30 @@ export default function ResidentGasBillingHistoryPage() {
         { href: "/user/profile", label: "Profile" },
         { href: "/user/gas-billing-history", label: "Gas Billing History" },
       ]}
+      compact
     >
-      {err ? (
-        <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-200">
-          {err}
-        </section>
-      ) : null}
+      {err ? <section className={billingAlertErr}>{err}</section> : null}
 
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-4 font-semibold">Filter</h2>
-        <form className="grid gap-3 md:grid-cols-3" onSubmit={loadHistory}>
-          <input type="month" className="rounded-md border border-zinc-300 p-2" value={month} onChange={(e) => setMonth(e.target.value)} />
-          <button className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white">Apply</button>
+      <section className={billingSection}>
+        <h2 className={billingH2}>Filter</h2>
+        <form className="grid gap-2 md:grid-cols-3" onSubmit={loadHistory}>
+          <input type="month" className={billingInput} value={month} onChange={(e) => setMonth(e.target.value)} />
+          <button className={billingButton}>Apply</button>
         </form>
       </section>
 
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-4 font-semibold">My Bills</h2>
+      <section className={billingSection}>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold">My Bills</h2>
+          <button
+            type="button"
+            onClick={() => downloadBillingHistoryCsv(sortedRows, "my-gas-bills")}
+            disabled={sortedRows.length === 0}
+            className="rounded border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-800 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+          >
+            Download CSV
+          </button>
+        </div>
         <BillingHistoryList
           rows={sortedRows}
           sortKey={sortKey}

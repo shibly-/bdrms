@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Flame, Home } from "lucide-react";
+import { ChevronDown, Flame } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   AUTH_LANDING_PATH,
@@ -10,9 +10,16 @@ import {
   isAccessTokenExpired,
 } from "@/lib/auth-session";
 
-type MenuItem = {
+type MenuLink = {
   href: string;
   label: string;
+};
+
+/** A top menu entry: either a direct link (href) or a group with submenus. */
+type MenuItem = {
+  label: string;
+  href?: string;
+  children?: MenuLink[];
 };
 
 type AppShellProps = {
@@ -20,31 +27,42 @@ type AppShellProps = {
   subtitle?: string;
   menu: MenuItem[];
   children: React.ReactNode;
+  /** Tighter title card and page spacing (used on billing pages). */
+  compact?: boolean;
 };
 
-export function AppShell({ title, subtitle, menu, children }: AppShellProps) {
+export function AppShell({ title, subtitle, menu, children, compact = false }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [role, setRole] = useState<string>("");
   const [token, setToken] = useState<string>("");
   const [portalReady, setPortalReady] = useState(false);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
 
-  const menuHrefKey = useMemo(
-    () => menu.map((item) => item.href).join("\0"),
+  const allHrefs = useMemo(
+    () =>
+      menu.flatMap((item) =>
+        item.children
+          ? item.children.map((c) => c.href)
+          : item.href
+            ? [item.href]
+            : [],
+      ),
     [menu],
   );
+  const menuHrefKey = useMemo(() => allHrefs.join("\0"), [allHrefs]);
 
   const hasAdminMenus = useMemo(
-    () => menu.some((item) => item.href.startsWith("/admin")),
-    [menu],
+    () => allHrefs.some((href) => href.startsWith("/admin")),
+    [allHrefs],
   );
   const hasStaffMenus = useMemo(
-    () => menu.some((item) => item.href.startsWith("/staff")),
-    [menu],
+    () => allHrefs.some((href) => href.startsWith("/staff")),
+    [allHrefs],
   );
   const hasUserMenus = useMemo(
-    () => menu.some((item) => item.href.startsWith("/user")),
-    [menu],
+    () => allHrefs.some((href) => href.startsWith("/user")),
+    [allHrefs],
   );
   const isAdminContext = pathname.startsWith("/admin") || hasAdminMenus;
   const isStaffContext = pathname.startsWith("/staff") || hasStaffMenus;
@@ -91,8 +109,18 @@ export function AppShell({ title, subtitle, menu, children }: AppShellProps) {
     isUserContext,
   ]);
 
-  const showSidebar = portalReady;
-  const visibleMenu = menu;
+  useEffect(() => {
+    setOpenMenu(null);
+  }, [pathname]);
+
+  const showMenu = portalReady && menu.length > 0;
+
+  function isLinkActive(href: string): boolean {
+    if (href === "/admin" || href === "/staff" || href === "/user") {
+      return pathname === href;
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
 
   function handleLogout() {
     clearAuthStorage();
@@ -110,22 +138,97 @@ export function AppShell({ title, subtitle, menu, children }: AppShellProps) {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/95 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="rounded-lg bg-zinc-900 p-2 text-white">
-              <Flame className="h-4 w-4" />
+      <header className="sticky top-0 z-50 overflow-visible border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="mx-auto flex h-11 max-w-7xl items-center gap-3 overflow-visible px-3 sm:px-4">
+          <Link href="/" className="flex shrink-0 items-center gap-1.5">
+            <span className="rounded-md bg-zinc-900 p-1 text-white">
+              <Flame className="h-3.5 w-3.5" />
             </span>
-            <span className="text-sm font-semibold tracking-wide text-zinc-900">
+            <span className="text-sm font-semibold tracking-wide text-zinc-900 dark:text-zinc-50">
               PRRMS
             </span>
           </Link>
-          <div className="flex items-center gap-2 text-sm">
+
+          {showMenu ? (
+            <nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-visible">
+              {menu.map((item) => {
+                if (item.children && item.children.length > 0) {
+                  const isOpen = openMenu === item.label;
+                  const groupActive = item.children.some((c) =>
+                    isLinkActive(c.href),
+                  );
+                  return (
+                    <div key={item.label} className="relative shrink-0">
+                      <button
+                        type="button"
+                        aria-haspopup="menu"
+                        aria-expanded={isOpen}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenu((o) => (o === item.label ? null : item.label));
+                        }}
+                        className={`inline-flex items-center gap-0.5 rounded px-2 py-1 text-sm font-medium transition ${
+                          groupActive || isOpen
+                            ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                            : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+                        }`}
+                      >
+                        {item.label}
+                        <ChevronDown
+                          className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                          aria-hidden
+                        />
+                      </button>
+                      {isOpen ? (
+                        <div
+                          role="menu"
+                          className="absolute left-0 top-[calc(100%+2px)] z-[80] min-w-[200px] rounded-md border border-zinc-200 bg-white py-0.5 shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
+                        >
+                          {item.children.map((c) => (
+                            <Link
+                              key={c.href}
+                              href={c.href}
+                              role="menuitem"
+                              className={`block px-3 py-1.5 text-sm transition ${
+                                isLinkActive(c.href)
+                                  ? "bg-zinc-100 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-white"
+                                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+                              }`}
+                            >
+                              {c.label}
+                            </Link>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                }
+                if (!item.href) return null;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`shrink-0 rounded px-2 py-1 text-sm font-medium transition ${
+                      isLinkActive(item.href)
+                        ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                        : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          ) : (
+            <div className="flex-1" />
+          )}
+
+          <div className="flex shrink-0 items-center gap-1.5 text-sm">
             {isLoggedIn ? (
               <button
                 type="button"
                 onClick={handleLogout}
-                className="rounded-md bg-zinc-900 px-3 py-1.5 text-white hover:bg-zinc-700 dark:hover:bg-zinc-700"
+                className="rounded bg-zinc-900 px-2.5 py-1 text-white hover:bg-zinc-700 dark:hover:bg-zinc-700"
               >
                 Logout
               </button>
@@ -133,13 +236,13 @@ export function AppShell({ title, subtitle, menu, children }: AppShellProps) {
               <>
                 <Link
                   href="/login"
-                  className="rounded-md px-3 py-1.5 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
+                  className="rounded px-2.5 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
                 >
                   Login
                 </Link>
                 <Link
                   href="/register"
-                  className="rounded-md bg-zinc-900 px-3 py-1.5 text-white hover:bg-zinc-700 dark:hover:bg-zinc-700"
+                  className="rounded bg-zinc-900 px-2.5 py-1 text-white hover:bg-zinc-700 dark:hover:bg-zinc-700"
                 >
                   Register
                 </Link>
@@ -149,40 +252,40 @@ export function AppShell({ title, subtitle, menu, children }: AppShellProps) {
         </div>
       </header>
 
-      <div className={`mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 sm:px-6 ${showSidebar ? "lg:grid-cols-[260px_1fr]" : ""}`}>
-        {showSidebar ? (
-          <aside className="h-fit rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Menus
-            </p>
-            <nav className="space-y-1">
-              <Link
-                href="/"
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
-              >
-                <Home className="h-4 w-4" />
-                Dashboard Home
-              </Link>
-              {visibleMenu.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="block rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-          </aside>
-        ) : null}
+      {openMenu ? (
+        <button
+          type="button"
+          aria-hidden
+          tabIndex={-1}
+          className="fixed inset-0 z-40 cursor-default bg-transparent"
+          onClick={() => setOpenMenu(null)}
+        />
+      ) : null}
 
-        <main className="space-y-6">
-          <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+      <div
+        className={`mx-auto grid w-full max-w-7xl px-3 sm:px-4 ${
+          compact ? "gap-3 py-3" : "gap-6 py-6"
+        }`}
+      >
+        <main className={compact ? "space-y-3" : "space-y-6"}>
+          <section
+            className={`border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 ${
+              compact ? "rounded-lg px-3 py-2" : "rounded-2xl p-6"
+            }`}
+          >
+            <h1
+              className={`font-bold tracking-tight text-zinc-900 dark:text-zinc-50 ${
+                compact ? "text-lg" : "text-2xl"
+              }`}
+            >
               {title}
             </h1>
             {subtitle ? (
-              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+              <p
+                className={`text-zinc-600 dark:text-zinc-300 ${
+                  compact ? "mt-0.5 text-xs" : "mt-2 text-sm"
+                }`}
+              >
                 {subtitle}
               </p>
             ) : null}

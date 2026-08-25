@@ -163,10 +163,14 @@ export class AdminService {
     return row;
   }
 
-  async deleteBuilding(id: number) {
+  async setBuildingActive(id: number, isActive: boolean) {
     await this.getBuilding(id);
-    await this.db.delete(schema.buildings).where(eq(schema.buildings.id, id));
-    return { deleted: true };
+    const [row] = await this.db
+      .update(schema.buildings)
+      .set({ isActive: isActive ? 1 : 0 })
+      .where(eq(schema.buildings.id, id))
+      .returning();
+    return row;
   }
 
   async listFlats() {

@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ADMIN_STAFF_ROLES,
   ADMIN_STAFF_USER_ROLES,
@@ -40,6 +50,29 @@ export class BillingController {
   @Roles(...ADMIN_STAFF_ROLES)
   getFlatContext(@Query('flatId') flatId?: string) {
     return this.billingService.getFlatBillingContext(Number(flatId));
+  }
+
+  @Get('building-context')
+  @Roles(...ADMIN_STAFF_ROLES)
+  getBuildingContext(@Query('buildingId') buildingId?: string) {
+    return this.billingService.getBuildingBillingContext(Number(buildingId));
+  }
+
+  @Post('generate-building')
+  @Roles(...ADMIN_STAFF_ROLES)
+  generateForBuilding(
+    @Req() req: { user?: { sub?: number } },
+    @Body()
+    body: {
+      buildingId: number;
+      items: { flatId: number; currentReading: number }[];
+    },
+  ) {
+    return this.billingService.createGasBillsForBuilding({
+      buildingId: body.buildingId,
+      items: body.items,
+      createdByUserId: req.user?.sub ?? null,
+    });
   }
 
   @Post('generate')
@@ -89,15 +122,53 @@ export class BillingController {
     @Query('gasMeterNo') gasMeterNo?: string,
     @Query('buildingId') buildingId?: string,
     @Query('flatId') flatId?: string,
+    @Query('status') status?: string,
   ) {
     const isResident = req.user?.role === UserRole.User;
     const scopedUserName = isResident ? req.user?.userName : userName;
+    const allowed = ['unpaid', 'paid', 'cancelled'] as const;
+    const statuses = status
+      ? (status
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s): s is (typeof allowed)[number] =>
+            (allowed as readonly string[]).includes(s),
+          ) as ('unpaid' | 'paid' | 'cancelled')[])
+      : undefined;
     return this.billingService.listBillingHistory({
       month,
       userName: scopedUserName,
       gasMeterNo,
       buildingId: buildingId ? Number(buildingId) : undefined,
       flatId: flatId ? Number(flatId) : undefined,
+      statuses: statuses && statuses.length > 0 ? statuses : undefined,
+    });
+  }
+
+  @Get('bill/:id')
+  @Roles(...ADMIN_STAFF_ROLES)
+  getBill(@Param('id', ParseIntPipe) id: number) {
+    return this.billingService.getBillById(id);
+  }
+
+  @Post(':id/mark-paid')
+  @Roles(UserRole.Admin)
+  markPaid(@Param('id', ParseIntPipe) id: number) {
+    return this.billingService.markBillPaid(id);
+  }
+
+  @Post(':id/update')
+  @Roles(UserRole.Admin)
+  updateBill(
+    @Req() req: { user?: { sub?: number } },
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { currentReading: number; updateReason: string },
+  ) {
+    return this.billingService.updateUnpaidBill({
+      billId: id,
+      currentReading: body.currentReading,
+      updateReason: body.updateReason,
+      updatedByUserId: req.user?.sub ?? null,
     });
   }
 }

@@ -5,6 +5,18 @@ import { AppShell } from "@/components/app-shell";
 import { useUserRole } from "@/hooks/use-user-role";
 import { adminFetch } from "@/lib/admin-client";
 import { getAdminNavForRole } from "@/lib/admin-nav";
+import {
+  billingAlertErr,
+  billingAlertOk,
+  billingButton,
+  billingH2,
+  billingInput,
+  billingLabel,
+  billingSection,
+  compactTab,
+  compactTabActive,
+  compactTabIdle,
+} from "@/lib/billing-ui";
 
 type Building = { id: number; name: string };
 type Flat = { id: number; flatNo: string; buildingId: number; buildingName: string };
@@ -127,30 +139,23 @@ export default function FlatsPage() {
       title="Flat/Apartment Management"
       subtitle="Only admin can create and manage flats/apartments."
       menu={getAdminNavForRole(role)}
+      compact
     >
-      {err ? (
-        <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-200">
-          {err}
-        </section>
-      ) : null}
-      {msg ? (
-        <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:text-emerald-200">
-          {msg}
-        </section>
-      ) : null}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mb-4 flex flex-wrap gap-2 border-b border-zinc-200 pb-3 dark:border-zinc-800">
+      {err ? <section className={billingAlertErr}>{err}</section> : null}
+      {msg ? <section className={billingAlertOk}>{msg}</section> : null}
+      <section className={billingSection}>
+        <div className="mb-2 flex flex-wrap gap-1.5 border-b border-zinc-200 pb-2 dark:border-zinc-800">
           <button
             type="button"
             onClick={() => setActiveTab("list")}
-            className={`rounded-md px-3 py-1.5 text-sm ${activeTab === "list" ? "bg-zinc-900 text-white" : "border border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"}`}
+            className={`${compactTab} ${activeTab === "list" ? compactTabActive : compactTabIdle}`}
           >
             Flat List
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("form")}
-            className={`rounded-md px-3 py-1.5 text-sm ${activeTab === "form" ? "bg-zinc-900 text-white" : "border border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200"}`}
+            className={`${compactTab} ${activeTab === "form" ? compactTabActive : compactTabIdle}`}
           >
             Add Flat/Apartment
           </button>
@@ -158,11 +163,11 @@ export default function FlatsPage() {
 
         {activeTab === "list" ? (
           <>
-            <h2 className="mb-4 font-semibold">Flat List</h2>
-            <label className="mb-3 block text-sm text-zinc-700 dark:text-zinc-300">
+            <h2 className={billingH2}>Flat List</h2>
+            <label className={`${billingLabel} mb-2 block md:max-w-sm`}>
               Building
               <select
-                className="mt-1 w-full rounded-md border border-zinc-300 p-2 md:max-w-sm"
+                className={billingInput}
                 value={listBuildingId}
                 onChange={(e) => setListBuildingId(Number(e.target.value) || "")}
               >
@@ -172,36 +177,36 @@ export default function FlatsPage() {
                 ))}
               </select>
             </label>
-            <table className="min-w-full text-sm">
+            <table className="min-w-full text-xs">
               <thead>
                 <tr className="border-b border-zinc-200 text-left">
-                  <th>
+                  <th className="py-1.5 pr-2">
                     <button type="button" onClick={() => toggleSort("flatNo")} className="font-semibold">
                       Flat No{sortMark("flatNo")}
                     </button>
                   </th>
-                  <th>
+                  <th className="py-1.5 pr-2">
                     <button type="button" onClick={() => toggleSort("buildingName")} className="font-semibold">
                       Building{sortMark("buildingName")}
                     </button>
                   </th>
-                  <th className="w-[140px]" />
+                  <th className="w-[140px] py-1.5" />
                 </tr>
               </thead>
               <tbody>
                 {!listBuildingId ? (
                   <tr className="border-b border-zinc-100">
-                    <td className="py-3 text-zinc-500" colSpan={3}>
+                    <td className="py-2 text-zinc-500" colSpan={3}>
                       Select a building to view flats.
                     </td>
                   </tr>
                 ) : null}
                 {sortedFlats.map((f) => (
                   <tr key={f.id} className="border-b border-zinc-100">
-                    <td className="py-2">{f.flatNo}</td>
-                    <td>{f.buildingName}</td>
-                    <td>
-                      <div className="flex gap-3">
+                    <td className="py-1.5 pr-2">{f.flatNo}</td>
+                    <td className="py-1.5 pr-2">{f.buildingName}</td>
+                    <td className="py-1.5">
+                      <div className="flex gap-2">
                         <button className="text-blue-600" onClick={() => startEdit(f)}>
                           Edit
                         </button>
@@ -222,27 +227,27 @@ export default function FlatsPage() {
 
         {activeTab === "form" ? (
           <>
-            <h2 className="mb-4 font-semibold">
+            <h2 className={billingH2}>
               {editingId === null ? "Add Flat/Apartment" : "Edit Flat/Apartment"}
             </h2>
-            <form className="grid gap-3 md:grid-cols-2" onSubmit={submitFlat}>
-              <input className="rounded-md border border-zinc-300 p-2" placeholder="Flat/Apartment No" value={flatNo} onChange={(e) => setFlatNo(e.target.value)} required />
-              <select className="rounded-md border border-zinc-300 p-2" value={buildingId} onChange={(e) => setBuildingId(Number(e.target.value))} required>
+            <form className="grid gap-2 md:grid-cols-2" onSubmit={submitFlat}>
+              <input className={billingInput} placeholder="Flat/Apartment No" value={flatNo} onChange={(e) => setFlatNo(e.target.value)} required />
+              <select className={billingInput} value={buildingId} onChange={(e) => setBuildingId(Number(e.target.value))} required>
                 {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
               {editingId === null ? (
-                <button className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white md:col-span-2">
+                <button className={`${billingButton} md:col-span-2`}>
                   Save Flat
                 </button>
               ) : (
-                <div className="md:col-span-2 flex gap-3">
-                  <button className="flex-1 rounded-md bg-zinc-900 px-4 py-2 text-sm text-white">
+                <div className="flex gap-2 md:col-span-2">
+                  <button className={`${billingButton} flex-1`}>
                     Update Flat
                   </button>
                   <button
                     type="button"
                     onClick={cancelEdit}
-                    className="rounded-md border border-zinc-300 px-4 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:text-zinc-100"
+                    className="rounded border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-900 dark:border-zinc-700 dark:text-zinc-100"
                   >
                     Cancel
                   </button>

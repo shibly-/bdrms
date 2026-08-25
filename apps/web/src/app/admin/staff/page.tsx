@@ -5,6 +5,17 @@ import { AppShell } from "@/components/app-shell";
 import { useUserRole } from "@/hooks/use-user-role";
 import { adminFetch } from "@/lib/admin-client";
 import { getAdminNavForRole } from "@/lib/admin-nav";
+import {
+  billingAlertErr,
+  billingAlertOk,
+  billingButton,
+  billingH2,
+  billingInput,
+  billingSection,
+  compactTab,
+  compactTabActive,
+  compactTabIdle,
+} from "@/lib/billing-ui";
 
 type StaffRow = { id: number; userName: string; fullName: string; profile?: { operationArea?: string | null } | null };
 
@@ -112,22 +123,23 @@ export default function StaffPage() {
       title="Staff User Management"
       subtitle="Only admin can create and manage staff users."
       menu={getAdminNavForRole(role)}
+      compact
     >
-      {err ? <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{err}</section> : null}
-      {msg ? <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{msg}</section> : null}
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <div className="mb-4 flex flex-wrap gap-2 border-b border-zinc-200 pb-3">
+      {err ? <section className={billingAlertErr}>{err}</section> : null}
+      {msg ? <section className={billingAlertOk}>{msg}</section> : null}
+      <section className={billingSection}>
+        <div className="mb-2 flex flex-wrap gap-1.5 border-b border-zinc-200 pb-2">
           <button
             type="button"
             onClick={() => setActiveTab("list")}
-            className={`rounded-md px-3 py-1.5 text-sm ${activeTab === "list" ? "bg-zinc-900 text-white" : "border border-zinc-300 text-zinc-700"}`}
+            className={`${compactTab} ${activeTab === "list" ? compactTabActive : compactTabIdle}`}
           >
             Staff List
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("form")}
-            className={`rounded-md px-3 py-1.5 text-sm ${activeTab === "form" ? "bg-zinc-900 text-white" : "border border-zinc-300 text-zinc-700"}`}
+            className={`${compactTab} ${activeTab === "form" ? compactTabActive : compactTabIdle}`}
           >
             Add Staff User
           </button>
@@ -135,24 +147,24 @@ export default function StaffPage() {
 
         {activeTab === "list" ? (
           <>
-            <h2 className="mb-4 font-semibold">Staff List</h2>
-            <table className="min-w-full text-sm">
+            <h2 className={billingH2}>Staff List</h2>
+            <table className="min-w-full text-xs">
               <thead>
                 <tr className="border-b border-zinc-200 text-left">
-                  <th><button onClick={() => toggleSort("userName")} className="font-semibold">User Name</button></th>
-                  <th><button onClick={() => toggleSort("fullName")} className="font-semibold">Full Name</button></th>
-                  <th><button onClick={() => toggleSort("operationArea")} className="font-semibold">Operation Area</button></th>
-                  <th className="w-[140px]" />
+                  <th className="py-1.5 pr-2"><button onClick={() => toggleSort("userName")} className="font-semibold">User Name</button></th>
+                  <th className="py-1.5 pr-2"><button onClick={() => toggleSort("fullName")} className="font-semibold">Full Name</button></th>
+                  <th className="py-1.5 pr-2"><button onClick={() => toggleSort("operationArea")} className="font-semibold">Operation Area</button></th>
+                  <th className="w-[140px] py-1.5" />
                 </tr>
               </thead>
               <tbody>
                 {sortedRows.map((r) => (
                   <tr key={r.id} className="border-b border-zinc-100">
-                    <td className="py-2">{r.userName}</td>
-                    <td>{r.fullName}</td>
-                    <td>{r.profile?.operationArea ?? "-"}</td>
-                    <td>
-                      <div className="flex gap-3">
+                    <td className="py-1.5 pr-2">{r.userName}</td>
+                    <td className="py-1.5 pr-2">{r.fullName}</td>
+                    <td className="py-1.5 pr-2">{r.profile?.operationArea ?? "-"}</td>
+                    <td className="py-1.5">
+                      <div className="flex gap-2">
                         <button className="text-blue-600" onClick={() => startEdit(r)}>Edit</button>
                         <button className="text-red-600" onClick={() => void removeStaff(r.id)}>Delete</button>
                       </div>
@@ -166,21 +178,21 @@ export default function StaffPage() {
 
         {activeTab === "form" ? (
           <>
-            <h2 className="mb-4 font-semibold">{editingId === null ? "Add Staff User" : "Edit Staff User"}</h2>
-            <form className="grid gap-3 md:grid-cols-2" onSubmit={submit}>
-              <input className="rounded-md border border-zinc-300 p-2" placeholder="User Name" value={form.userName} onChange={(e) => setForm((v) => ({ ...v, userName: e.target.value }))} required />
-              <input className="rounded-md border border-zinc-300 p-2" placeholder="Full Name" value={form.fullName} onChange={(e) => setForm((v) => ({ ...v, fullName: e.target.value }))} required />
-              <input className="rounded-md border border-zinc-300 p-2" placeholder="Phone No" value={form.phone} onChange={(e) => setForm((v) => ({ ...v, phone: e.target.value }))} />
-              <input type="email" className="rounded-md border border-zinc-300 p-2" placeholder="Email" value={form.email} onChange={(e) => setForm((v) => ({ ...v, email: e.target.value }))} />
-              <input type="password" className="rounded-md border border-zinc-300 p-2" placeholder="Password" value={form.password} onChange={(e) => setForm((v) => ({ ...v, password: e.target.value }))} required minLength={8} />
-              <input className="rounded-md border border-zinc-300 p-2" placeholder="Operation Area Name (Optional)" value={form.operationArea} onChange={(e) => setForm((v) => ({ ...v, operationArea: e.target.value }))} />
-              <textarea className="rounded-md border border-zinc-300 p-2 md:col-span-2" placeholder="Address" rows={3} value={form.address} onChange={(e) => setForm((v) => ({ ...v, address: e.target.value }))} />
+            <h2 className={billingH2}>{editingId === null ? "Add Staff User" : "Edit Staff User"}</h2>
+            <form className="grid gap-2 md:grid-cols-3" onSubmit={submit}>
+              <input className={billingInput} placeholder="User Name" value={form.userName} onChange={(e) => setForm((v) => ({ ...v, userName: e.target.value }))} required />
+              <input className={billingInput} placeholder="Full Name" value={form.fullName} onChange={(e) => setForm((v) => ({ ...v, fullName: e.target.value }))} required />
+              <input className={billingInput} placeholder="Phone No" value={form.phone} onChange={(e) => setForm((v) => ({ ...v, phone: e.target.value }))} />
+              <input type="email" className={billingInput} placeholder="Email" value={form.email} onChange={(e) => setForm((v) => ({ ...v, email: e.target.value }))} />
+              <input type="password" className={billingInput} placeholder="Password" value={form.password} onChange={(e) => setForm((v) => ({ ...v, password: e.target.value }))} required minLength={8} />
+              <input className={billingInput} placeholder="Operation Area Name (Optional)" value={form.operationArea} onChange={(e) => setForm((v) => ({ ...v, operationArea: e.target.value }))} />
+              <textarea className={`${billingInput} md:col-span-3`} placeholder="Address" rows={2} value={form.address} onChange={(e) => setForm((v) => ({ ...v, address: e.target.value }))} />
               {editingId === null ? (
-                <button className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white md:col-span-2">Save Staff User</button>
+                <button className={`${billingButton} md:col-span-3`}>Save Staff User</button>
               ) : (
-                <div className="md:col-span-2 flex gap-3">
-                  <button className="flex-1 rounded-md bg-zinc-900 px-4 py-2 text-sm text-white">Update Staff User</button>
-                  <button type="button" onClick={cancelEdit} className="rounded-md border border-zinc-300 px-4 py-2 text-sm text-zinc-900">Cancel</button>
+                <div className="flex gap-2 md:col-span-3">
+                  <button className={`${billingButton} flex-1`}>Update Staff User</button>
+                  <button type="button" onClick={cancelEdit} className="rounded border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-900">Cancel</button>
                 </div>
               )}
             </form>

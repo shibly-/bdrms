@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { Flame } from "lucide-react";
-import { BookOpen, Building2, ReceiptText, UserCog } from "lucide-react";
+import { BookOpen, Building2, ReceiptText, UserCog, Fuel, Milk, ArrowBigRight } from "lucide-react";
 
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center gap-4 px-4 py-8 dark:text-zinc-50">
+    <main className="rounded-2xl border border-zinc-200 mx-auto flex min-h-screen max-w-5xl flex-col justify-center gap-4 px-4 py-8 dark:text-zinc-50">
+
       <section className="flex flex-wrap items-center justify-center gap-3">
         <div className="flex items-center gap-2">
           <Flame className="h-6 w-6" aria-hidden/>
-          <h2 className="text-2xl font-semibold text-zinc-900">PRRMS - Billing System</h2>
+          <h2 className="text-2xl font-semibold text-zinc-900">PRRMS - Gas Billing System</h2>
         </div>     
       </section>
 
@@ -23,62 +24,14 @@ export default function Home() {
           href="/login"
           className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
         >
-          Sign in
-        </Link>
-        <Link
-          href="/register"
-          className="rounded-md border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
-        >
-          Create account
-        </Link>
-
-        <Link
-          href="/docs"
-          className="rounded-md border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
-        >
-          View docs
-        </Link>
+          User Login
+        </Link>        
       </section>
 
-      <section className="grid gap-3 md:grid-cols-3">
-        <Link
-          href="/admin"
-          className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800"
-        >
-          <div className="flex items-center gap-2">
-            <UserCog className="h-5 w-5 text-zinc-700" />
-            <h2 className="font-semibold text-zinc-900">Admin</h2>
-          </div>
-          <p className="mt-1 text-sm text-zinc-600">
-            Manage buildings, flats, users, staff, and configuration.
-          </p>
-        </Link>
-
-        <Link
-          href="/staff"
-          className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800"
-        >
-          <div className="flex items-center gap-2">
-            <ReceiptText className="h-5 w-5 text-zinc-700" />
-            <h2 className="font-semibold text-zinc-900">Staff</h2>
-          </div>
-          <p className="mt-1 text-sm text-zinc-600">
-            Generate meter bills and view monthly reporting.
-          </p>
-        </Link>
-
-        <Link
-          href="/user"
-          className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800"
-        >
-          <div className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-zinc-700" />
-            <h2 className="font-semibold text-zinc-900">Resident</h2>
-          </div>
-          <p className="mt-1 text-sm text-zinc-600">
-            Register, sign in, and check your billing history.
-          </p>
-        </Link>
+      <section className="flex flex-wrap items-center justify-center gap-3">
+        <div className="flex items-center gap-2">            
+          <h2 className="font-semibold text-zinc-900">Your LPG </h2><Milk className="h-5 w-5 text-zinc-700" /> <ArrowBigRight className="h-5 w-5 text-zinc-700" /> <Flame className="h-5 w-5 text-zinc-700" /><h2 className="font-semibold text-zinc-900"> Gas Billing</h2><ReceiptText className="h-5 w-5 text-zinc-700" />
+        </div>
       </section>
       
       <section className="flex flex-wrap items-center justify-center gap-3">
@@ -87,6 +40,7 @@ export default function Home() {
           <br />Block # J, South Banasree, Dhaka-1219
         </p>        
       </section>
+
       <section className="flex flex-wrap items-center justify-center gap-3">
         <Link
             href="https://www.linkedin.com/in/shibly/"
@@ -95,6 +49,7 @@ export default function Home() {
             Developed By: A S M Abdur Rab
           </Link>
       </section>
+
     </main>
   );
 }
