@@ -1,5 +1,5 @@
 import { clearAuthStorage } from "./auth-session";
-import { getApiBaseUrl } from "./api";
+import { requireApiBaseUrl } from "./api";
 
 export function getAccessToken() {
   if (typeof window === "undefined") return "";
@@ -18,7 +18,7 @@ export async function adminFetch<T>(path: string, init?: RequestInit): Promise<T
   const token = getAccessToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(`${getApiBaseUrl()}${path}`, { ...init, headers });
+  const res = await fetch(`${requireApiBaseUrl()}${path}`, { ...init, headers });
   const data = (await res.json().catch(() => ({}))) as T & { message?: string };
   if (res.status === 401) {
     redirectToLandingForUnauthorized();
