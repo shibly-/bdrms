@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Building2, Flame, Loader2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { requireApiBaseUrl } from "@/lib/api";
+import { getApiBaseUrl } from "@/lib/api";
 
 type Building = {
   id: number;
@@ -30,6 +30,7 @@ type RegisterResponse = {
 
 export default function RegisterPage() {
   const router = useRouter();
+  const base = getApiBaseUrl();
 
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [flats, setFlats] = useState<Flat[]>([]);
@@ -61,7 +62,7 @@ export default function RegisterPage() {
     setLoadBuildings(true);
     setError(null);
     try {
-      const res = await fetch(`${requireApiBaseUrl()}/auth/buildings`);
+      const res = await fetch(`${base}/auth/buildings`);
       if (!res.ok) {
         setError("Could not load buildings.");
         setBuildings([]);
@@ -69,15 +70,13 @@ export default function RegisterPage() {
       }
       const data = (await res.json()) as Building[];
       setBuildings(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Could not reach the server. Is the API running?",
-      );
+    } catch {
+      setError("Could not reach the server. Is the API running?");
       setBuildings([]);
     } finally {
       setLoadBuildings(false);
     }
-  }, []);
+  }, [base]);
 
   useEffect(() => {
     void loadBuildingList();
@@ -96,7 +95,7 @@ export default function RegisterPage() {
 
     void (async () => {
       try {
-        const res = await fetch(`${requireApiBaseUrl()}/auth/buildings/${buildingId}/flats`);
+        const res = await fetch(`${base}/auth/buildings/${buildingId}/flats`);
         if (!res.ok || cancelled) {
           if (!cancelled) setFlats([]);
           return;
@@ -113,7 +112,7 @@ export default function RegisterPage() {
     return () => {
       cancelled = true;
     };
-  }, [buildingId]);
+  }, [base, buildingId]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -134,7 +133,7 @@ export default function RegisterPage() {
 
     setPending(true);
     try {
-      const res = await fetch(`${requireApiBaseUrl()}/auth/register`, {
+      const res = await fetch(`${base}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -172,10 +171,8 @@ export default function RegisterPage() {
 
       router.push("/user");
       router.refresh();
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Could not reach the server. Is the API running?",
-      );
+    } catch {
+      setError("Could not reach the server. Is the API running?");
     } finally {
       setPending(false);
     }

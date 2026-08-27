@@ -5,7 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Flame, Loader2, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getApiBaseUrl, requireApiBaseUrl } from "@/lib/api";
+import { getApiBaseUrl } from "@/lib/api";
 
 type LoginResponse = {
   accessToken: string;
@@ -37,7 +37,7 @@ export default function LoginPage() {
     setPending(true);
 
     try {
-      const res = await fetch(`${requireApiBaseUrl()}/auth/login`, {
+      const res = await fetch(`${getApiBaseUrl()}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userName: userName.trim(), password }),
@@ -69,10 +69,8 @@ export default function LoginPage() {
 
       router.push(redirectPathForRole(ok.role));
       router.refresh();
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Could not reach the server. Is the API running?",
-      );
+    } catch {
+      setError("Could not reach the server. Is the API running?");
     } finally {
       setPending(false);
     }
