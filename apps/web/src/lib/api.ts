@@ -1,7 +1,6 @@
-/**
- * Browser calls same-origin `/api`. Next.js rewrites those requests to the
- * Nest server (local PORT 4000, or API_ORIGIN on Vercel).
- */
 export function getApiBaseUrl(): string {
-  return "/api";
+  return (
+    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
+    "http://localhost:4000/api"
+  );
 }
