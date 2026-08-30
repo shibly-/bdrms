@@ -413,10 +413,12 @@ export class BillingService {
   }
 
   /**
-   * Creates gas bills for every submitted flat of a building in one transaction.
+   * Creates gas bills for submitted flats of a building in one transaction.
    * The billing date is always the present date (server-side), so the caller
-   * cannot override it. Rejects the whole batch if any current reading is
-   * missing/invalid or references a flat that is not billable in the building.
+   * cannot override it. Flats whose current reading is not greater than the
+   * previous reading are skipped (no bill, no total). Rejects the batch if any
+   * current reading is missing/invalid or references a flat that is not
+   * billable in the building, or if no flat has an increased reading.
    */
   async createGasBillsForBuilding(input: CreateBuildingGasBillsInput) {
     const buildingId = Number(input.buildingId);
@@ -434,7 +436,11 @@ export class BillingService {
 
     const flatById = new Map(context.flats.map((f) => [f.flatId, f]));
 
-    const prepared = input.items.map((item) => {
+    const prepared: Array<{
+      flat: (typeof context.flats)[number];
+      preview: BillingPreview;
+    }> = [];
+    for (const item of input.items) {
       const flatId = Number(item.flatId);
       const flat = flatById.get(flatId);
       if (!flat) {
@@ -453,14 +459,23 @@ export class BillingService {
           `Current reading for flat ${flat.flatNo} must be a non-negative number`,
         );
       }
+      if (currentReading <= flat.previousReading) {
+        continue;
+      }
       const preview = this.calculate({
         previousReading: flat.previousReading,
         currentReading,
         unitPrice: context.unitPrice,
         operatingCostPerFlat: context.operatingCostPerFlat,
       });
-      return { flat, preview };
-    });
+      prepared.push({ flat, preview });
+    }
+
+    if (prepared.length === 0) {
+      throw new BadRequestException(
+        'No flats have a current reading greater than the previous reading. Bills were not created.',
+      );
+    }
 
     const billingDate = nowTimestamp();
     const createdByUserId =

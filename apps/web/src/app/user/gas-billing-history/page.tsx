@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { Download, Printer } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import {
   BillingHistoryList,
@@ -11,6 +12,7 @@ import {
   type GasBillDetailRow,
 } from "@/components/gas-bill-detail-modal";
 import { adminFetch } from "@/lib/admin-client";
+import { downloadBillingHistoryPdf } from "@/lib/bill-pdf";
 import { downloadBillingHistoryCsv } from "@/lib/billing-history-csv";
 import {
   billingAlertErr,
@@ -19,6 +21,9 @@ import {
   billingInput,
   billingSection,
 } from "@/lib/billing-ui";
+
+const exportBtn =
+  "inline-flex items-center gap-1 rounded border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-800 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700";
 
 type BillingRow = GasBillDetailRow;
 
@@ -62,8 +67,12 @@ export default function ResidentGasBillingHistoryPage() {
       } else if (sortKey === "billingDate") {
         cmp = String(a.billingDate).localeCompare(String(b.billingDate));
       } else {
-        cmp = String(a[sortKey] ?? "").localeCompare(String(b[sortKey] ?? ""));
+        cmp = String(a[sortKey] ?? "").localeCompare(String(b[sortKey] ?? ""), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
       }
+      if (cmp === 0) cmp = a.billId - b.billId;
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [rows, sortKey, sortDir]);
@@ -92,14 +101,31 @@ export default function ResidentGasBillingHistoryPage() {
       <section className={billingSection}>
         <div className="mb-2 flex items-center justify-between gap-3">
           <h2 className="text-sm font-semibold">My Bills</h2>
-          <button
-            type="button"
-            onClick={() => downloadBillingHistoryCsv(sortedRows, "my-gas-bills")}
-            disabled={sortedRows.length === 0}
-            className="rounded border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-800 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
-          >
-            Download CSV
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                downloadBillingHistoryPdf(sortedRows, {
+                  fileName: "my-gas-bills",
+                  showUser: false,
+                })
+              }
+              disabled={sortedRows.length === 0}
+              className={exportBtn}
+            >
+              <Printer className="h-3.5 w-3.5" aria-hidden />
+              Print PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadBillingHistoryCsv(sortedRows, "my-gas-bills")}
+              disabled={sortedRows.length === 0}
+              className={exportBtn}
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden />
+              Download CSV
+            </button>
+          </div>
         </div>
         <BillingHistoryList
           rows={sortedRows}

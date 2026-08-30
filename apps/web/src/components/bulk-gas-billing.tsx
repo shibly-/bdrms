@@ -48,10 +48,14 @@ function computeRow(
 ) {
   const current = Number(currentRaw);
   const hasValue = currentRaw.trim() !== "" && Number.isFinite(current);
-  const usageM3 = hasValue ? Math.max(0, current - previousReading) : 0;
+  const readingIncreased = hasValue && current > previousReading;
+  const usageM3 = readingIncreased ? current - previousReading : 0;
   const usageKg = usageM3 * KG_PER_M3;
-  const totalBill = hasValue ? usageKg * unitPrice + operatingCostPerFlat : 0;
-  return { hasValue, usageM3, usageKg, totalBill };
+  // Skip total bill unless current reading is strictly greater than previous.
+  const totalBill = readingIncreased
+    ? usageKg * unitPrice + operatingCostPerFlat
+    : 0;
+  return { hasValue, readingIncreased, usageM3, usageKg, totalBill };
 }
 
 export function BulkGasBillingForm({ buildingsEndpoint }: Props) {
@@ -81,7 +85,11 @@ export function BulkGasBillingForm({ buildingsEndpoint }: Props) {
         `/billing/building-context?buildingId=${id}`,
       );
       setCtx(data);
-      setReadings(Object.fromEntries(data.flats.map((f) => [f.flatId, ""])));
+      setReadings(
+        Object.fromEntries(
+          data.flats.map((f) => [f.flatId, String(f.previousReading ?? 0)]),
+        ),
+      );
     } catch (e) {
       setCtx(null);
       setErr(e instanceof Error ? e.message : "Failed to load building flats.");
@@ -103,12 +111,12 @@ export function BulkGasBillingForm({ buildingsEndpoint }: Props) {
   const unitPrice = ctx?.unitPrice ?? 0;
   const operatingCostPerFlat = ctx?.operatingCostPerFlat ?? 0;
 
-  const allFilled = useMemo(() => {
-    if (!ctx || ctx.flats.length === 0) return false;
-    return ctx.flats.every((f) => {
+  const billableFlats = useMemo(() => {
+    if (!ctx) return [];
+    return ctx.flats.filter((f) => {
       const raw = readings[f.flatId] ?? "";
       const n = Number(raw);
-      return raw.trim() !== "" && Number.isFinite(n) && n >= 0;
+      return raw.trim() !== "" && Number.isFinite(n) && n > f.previousReading;
     });
   }, [ctx, readings]);
 
@@ -128,18 +136,21 @@ export function BulkGasBillingForm({ buildingsEndpoint }: Props) {
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!ctx || !buildingId) return;
-    if (!allFilled) {
-      setErr("Enter Current Reading (m³) for every flat before submitting.");
+    if (billableFlats.length === 0) {
+      setErr(
+        "Current reading must be greater than previous reading for at least one flat. Flats with no increase are skipped.",
+      );
       return;
     }
     setSubmitting(true);
     setErr("");
     setMsg("");
     try {
-      const items = ctx.flats.map((f) => ({
+      const items = billableFlats.map((f) => ({
         flatId: f.flatId,
         currentReading: Number(readings[f.flatId]),
       }));
+      const skippedCount = ctx.flats.length - items.length;
       const res = await adminFetch<{ createdCount: number; billingDate: string }>(
         "/billing/generate-building",
         {
@@ -147,8 +158,12 @@ export function BulkGasBillingForm({ buildingsEndpoint }: Props) {
           body: JSON.stringify({ buildingId, items }),
         },
       );
+      const skippedNote =
+        skippedCount > 0
+          ? ` ${skippedCount} flat(s) skipped (current reading not greater than previous).`
+          : "";
       setMsg(
-        `Created ${res.createdCount} gas bill(s) dated ${res.billingDate} for ${ctx.building.name}.`,
+        `Created ${res.createdCount} gas bill(s) dated ${res.billingDate} for ${ctx.building.name}.${skippedNote}`,
       );
       // Refresh so previous readings reflect the newly created bills. Uses
       // loadContext (not onBuildingChange) to preserve the success message.
@@ -256,12 +271,13 @@ export function BulkGasBillingForm({ buildingsEndpoint }: Props) {
                 <tbody>
                   {ctx.flats.map((f) => {
                     const raw = readings[f.flatId] ?? "";
-                    const { hasValue, usageM3, usageKg, totalBill } = computeRow(
-                      f.previousReading,
-                      raw,
-                      unitPrice,
-                      operatingCostPerFlat,
-                    );
+                    const { readingIncreased, usageM3, usageKg, totalBill } =
+                      computeRow(
+                        f.previousReading,
+                        raw,
+                        unitPrice,
+                        operatingCostPerFlat,
+                      );
                     return (
                       <tr
                         key={f.flatId}
@@ -286,13 +302,13 @@ export function BulkGasBillingForm({ buildingsEndpoint }: Props) {
                           <input
                             type="number"
                             step="0.001"
-                            min="0"
+                            min={f.previousReading}
                             inputMode="decimal"
                             aria-label={`Current reading for flat ${f.flatNo}`}
                             className={`w-24 rounded border px-1.5 py-0.5 text-right tabular-nums dark:bg-zinc-950 ${
-                              raw.trim() === ""
-                                ? "border-amber-300 dark:border-amber-700/60"
-                                : "border-zinc-300 dark:border-zinc-700"
+                              readingIncreased
+                                ? "border-zinc-300 dark:border-zinc-700"
+                                : "border-amber-300 dark:border-amber-700/60"
                             }`}
                             value={raw}
                             onChange={(e) =>
@@ -305,13 +321,13 @@ export function BulkGasBillingForm({ buildingsEndpoint }: Props) {
                           />
                         </td>
                         <td className="py-1.5 pr-2 text-right tabular-nums text-zinc-700 dark:text-zinc-300">
-                          {hasValue ? usageM3.toFixed(3) : "—"}
+                          {readingIncreased ? usageM3.toFixed(3) : "—"}
                         </td>
                         <td className="py-1.5 pr-2 text-right tabular-nums text-zinc-700 dark:text-zinc-300">
-                          {hasValue ? usageKg.toFixed(3) : "—"}
+                          {readingIncreased ? usageKg.toFixed(3) : "—"}
                         </td>
                         <td className="py-1.5 pl-2 text-right font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">
-                          {hasValue ? formatMoney(totalBill) : "—"}
+                          {readingIncreased ? formatMoney(totalBill) : "—"}
                         </td>
                       </tr>
                     );
@@ -337,18 +353,18 @@ export function BulkGasBillingForm({ buildingsEndpoint }: Props) {
           {ctx && ctx.flats.length > 0 ? (
             <div className="mt-2 flex items-center justify-between gap-3">
               <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                {allFilled
-                  ? "All readings entered. Bills will be dated today."
-                  : "Enter Current Reading (m³) for every flat to enable submission."}
+                {billableFlats.length > 0
+                  ? `Current reading defaults to previous. ${billableFlats.length} of ${ctx.flats.length} flat(s) will be billed. Unchanged readings are skipped.`
+                  : "Current reading defaults to previous. Raise at least one current reading above previous to generate a bill."}
               </p>
               <button
                 type="submit"
-                disabled={!allFilled || submitting}
+                disabled={billableFlats.length === 0 || submitting}
                 className={`${billingButton} disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 {submitting
                   ? "Generating bills…"
-                  : `Generate Bills for ${ctx.flats.length} Flat(s)`}
+                  : `Generate Bills for ${billableFlats.length} Flat(s)`}
               </button>
             </div>
           ) : null}

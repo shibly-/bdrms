@@ -1,12 +1,22 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Loader2, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
+  Download,
+  Loader2,
+  Printer,
+  X,
+} from "lucide-react";
 import {
   GasBillDetailModal,
   type GasBillDetailRow,
 } from "@/components/gas-bill-detail-modal";
 import { adminFetch } from "@/lib/admin-client";
+import { downloadUnpaidBillsPdf } from "@/lib/bill-pdf";
+import { downloadBillingHistoryCsv } from "@/lib/billing-history-csv";
 import {
   billingAlertErr,
   billingAlertOk,
@@ -16,6 +26,66 @@ import {
   billingSection,
 } from "@/lib/billing-ui";
 import { formatBillDateTime, formatMoney } from "@/lib/format";
+
+type UnpaidSortKey =
+  | "billId"
+  | "billingDate"
+  | "fullName"
+  | "buildingName"
+  | "flatNo"
+  | "gasMeterNo";
+
+const exportBtn =
+  "inline-flex items-center gap-1 rounded border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-800 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700";
+
+function cmpText(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function SortHeader({
+  label,
+  columnKey,
+  sortKey,
+  sortDir,
+  onToggle,
+  align = "left",
+}: {
+  label: string;
+  columnKey: UnpaidSortKey;
+  sortKey: UnpaidSortKey;
+  sortDir: "asc" | "desc";
+  onToggle: (key: UnpaidSortKey) => void;
+  align?: "left" | "right";
+}) {
+  const active = sortKey === columnKey;
+  return (
+    <th
+      className={`px-2 py-1.5 ${align === "right" ? "text-right" : "text-left"}`}
+    >
+      <button
+        type="button"
+        onClick={() => onToggle(columnKey)}
+        className={`inline-flex items-center gap-1 uppercase tracking-wide transition hover:text-zinc-900 dark:hover:text-zinc-100 ${
+          align === "right" ? "flex-row-reverse" : ""
+        }`}
+      >
+        <span>{label}</span>
+        {active ? (
+          sortDir === "asc" ? (
+            <ArrowUp className="h-3.5 w-3.5" aria-hidden />
+          ) : (
+            <ArrowDown className="h-3.5 w-3.5" aria-hidden />
+          )
+        ) : (
+          <ChevronsUpDown
+            className="h-3.5 w-3.5 text-zinc-300 dark:text-zinc-600"
+            aria-hidden
+          />
+        )}
+      </button>
+    </th>
+  );
+}
 
 type Building = { id: number; name: string; buildingNo: string | null; isActive?: number };
 type Flat = { id: number; flatNo: string; buildingId: number };
@@ -43,15 +113,39 @@ export function UnpaidGasBills({ buildingsEndpoint, isAdmin }: Props) {
   const [detailBill, setDetailBill] = useState<GasBillDetailRow | null>(null);
   const [editBill, setEditBill] = useState<GasBillDetailRow | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [sortKey, setSortKey] = useState<UnpaidSortKey>("billId");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const sortedRows = useMemo(
-    () =>
-      [...rows].sort((a, b) =>
-        sortDir === "asc" ? a.billId - b.billId : b.billId - a.billId,
-      ),
-    [rows, sortDir],
-  );
+  function toggleSort(next: UnpaidSortKey) {
+    if (sortKey === next) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(next);
+    setSortDir("asc");
+  }
+
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      let cmp: number;
+      if (sortKey === "billId") {
+        cmp = a.billId - b.billId;
+      } else if (sortKey === "billingDate") {
+        cmp =
+          new Date(a.billingDate).getTime() - new Date(b.billingDate).getTime();
+        if (!Number.isFinite(cmp) || cmp === 0) {
+          cmp = cmpText(String(a.billingDate), String(b.billingDate));
+        }
+      } else if (sortKey === "fullName") {
+        cmp = cmpText(a.fullName, b.fullName);
+        if (cmp === 0) cmp = cmpText(a.userName, b.userName);
+      } else {
+        cmp = cmpText(String(a[sortKey] ?? ""), String(b[sortKey] ?? ""));
+      }
+      if (cmp === 0) cmp = a.billId - b.billId;
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [rows, sortKey, sortDir]);
 
   useEffect(() => {
     void adminFetch<Building[]>(buildingsEndpoint)
@@ -193,11 +287,33 @@ export function UnpaidGasBills({ buildingsEndpoint, isAdmin }: Props) {
       </section>
 
       <section className={billingSection}>
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">Unpaid Bills</h2>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            {rows.length} bill{rows.length === 1 ? "" : "s"}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              {rows.length} bill{rows.length === 1 ? "" : "s"}
+            </span>
+            <button
+              type="button"
+              onClick={() => downloadUnpaidBillsPdf(sortedRows)}
+              disabled={sortedRows.length === 0}
+              className={exportBtn}
+            >
+              <Printer className="h-3.5 w-3.5" aria-hidden />
+              Print PDF
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                downloadBillingHistoryCsv(sortedRows, "unpaid-gas-bills")
+              }
+              disabled={sortedRows.length === 0}
+              className={exportBtn}
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden />
+              Download CSV
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -213,27 +329,49 @@ export function UnpaidGasBills({ buildingsEndpoint, isAdmin }: Props) {
             <table className="min-w-full text-xs">
               <thead className="bg-zinc-50 dark:bg-zinc-800/50">
                 <tr className="border-b border-zinc-200 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-                  <th className="px-2 py-1.5 text-right">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSortDir((d) => (d === "asc" ? "desc" : "asc"))
-                      }
-                      className="inline-flex flex-row-reverse items-center gap-1 uppercase tracking-wide transition hover:text-zinc-900 dark:hover:text-zinc-100"
-                    >
-                      <span>Id</span>
-                      {sortDir === "asc" ? (
-                        <ArrowUp className="h-3.5 w-3.5" aria-hidden />
-                      ) : (
-                        <ArrowDown className="h-3.5 w-3.5" aria-hidden />
-                      )}
-                    </button>
-                  </th>
-                  <th className="px-2 py-1.5">Date</th>
-                  <th className="px-2 py-1.5">User</th>
-                  <th className="px-2 py-1.5">Building</th>
-                  <th className="px-2 py-1.5">Flat</th>
-                  <th className="px-2 py-1.5">Meter</th>
+                  <SortHeader
+                    label="Id"
+                    columnKey="billId"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                    align="right"
+                  />
+                  <SortHeader
+                    label="Date"
+                    columnKey="billingDate"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
+                  <SortHeader
+                    label="User"
+                    columnKey="fullName"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
+                  <SortHeader
+                    label="Building"
+                    columnKey="buildingName"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
+                  <SortHeader
+                    label="Flat"
+                    columnKey="flatNo"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
+                  <SortHeader
+                    label="Meter"
+                    columnKey="gasMeterNo"
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onToggle={toggleSort}
+                  />
                   <th className="px-2 py-1.5 text-right">Current</th>
                   <th className="px-2 py-1.5 text-right">Total</th>
                   <th className="px-2 py-1.5 text-right">Actions</th>

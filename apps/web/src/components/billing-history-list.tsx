@@ -11,6 +11,8 @@ export type BillingSortKey =
   | "billId"
   | "billingDate"
   | "userName"
+  | "buildingName"
+  | "flatNo"
   | "gasMeterNo"
   | "totalBill";
 
@@ -135,6 +137,8 @@ export function BillingHistoryList({
     { key: "billingDate", label: "Date" },
     ...(showUser ? [{ key: "userName" as const, label: "User" }] : []),
     { key: "gasMeterNo", label: "Meter" },
+    { key: "buildingName", label: "Building" },
+    { key: "flatNo", label: "Flat" },
     { key: "totalBill", label: "Total bill" },
   ];
 
@@ -238,8 +242,8 @@ export function BillingHistoryList({
                 <HeaderCell label="User" sortable columnKey="userName" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
               ) : null}
               <HeaderCell label="Meter" sortable columnKey="gasMeterNo" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
-              <HeaderCell label="Building" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
-              <HeaderCell label="Flat" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
+              <HeaderCell label="Building" sortable columnKey="buildingName" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
+              <HeaderCell label="Flat" sortable columnKey="flatNo" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
               <HeaderCell label="Previous" align="right" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
               <HeaderCell label="Current" align="right" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
               <HeaderCell label="Usage m³" align="right" activeKey={sortKey} dir={sortDir} onToggleSort={onToggleSort} />
