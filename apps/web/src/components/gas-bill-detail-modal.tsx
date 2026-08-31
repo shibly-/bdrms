@@ -39,6 +39,8 @@ export type GasBillDetailRow = {
   supersededByBillId?: number | null;
   previousBillDate?: string | null;
   createdAt?: string | null;
+  /** Current reading of the user's most recent paid bill, if any. */
+  lastPaidCurrentReading?: number | null;
 };
 
 type Props = {

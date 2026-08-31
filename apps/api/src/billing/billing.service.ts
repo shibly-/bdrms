@@ -643,6 +643,7 @@ export class BillingService {
     const [row] = await this.db
       .select({
         billId: schema.bills.id,
+        standardUserId: schema.bills.standardUserId,
         billingDate: schema.bills.billingDate,
         previousReading: schema.bills.previousReading,
         currentReading: schema.bills.currentReading,
@@ -687,7 +688,31 @@ export class BillingService {
     if (!row) {
       throw new NotFoundException('Bill not found');
     }
-    return row;
+    const lastPaidCurrentReading = await this.lastPaidCurrentReadingForUser(
+      row.standardUserId,
+    );
+    return { ...row, lastPaidCurrentReading };
+  }
+
+  /**
+   * Latest paid bill's current reading for this user, or null if none exists.
+   */
+  private async lastPaidCurrentReadingForUser(
+    standardUserId: number,
+  ): Promise<number | null> {
+    const [lastPaid] = await this.db
+      .select({ currentReading: schema.bills.currentReading })
+      .from(schema.bills)
+      .where(
+        and(
+          eq(schema.bills.standardUserId, standardUserId),
+          eq(schema.bills.status, 'paid'),
+        ),
+      )
+      .orderBy(desc(schema.bills.billingDate), desc(schema.bills.id))
+      .limit(1);
+    if (!lastPaid) return null;
+    return Number(lastPaid.currentReading ?? 0);
   }
 
   /** Marks an unpaid bill as paid. Admin-only (enforced at the controller). */
@@ -765,6 +790,22 @@ export class BillingService {
     }
 
     const previousReading = Number(bill.previousReading ?? 0);
+    const lastPaidCurrentReading = await this.lastPaidCurrentReadingForUser(
+      bill.standardUserId,
+    );
+    if (
+      lastPaidCurrentReading != null &&
+      currentReading <= lastPaidCurrentReading
+    ) {
+      throw new BadRequestException(
+        `Current reading must be higher than the last paid bill's current reading (${lastPaidCurrentReading}).`,
+      );
+    }
+    if (currentReading <= previousReading) {
+      throw new BadRequestException(
+        'Current reading must be greater than previous reading. A bill cannot be updated when previous and current readings are the same.',
+      );
+    }
     const unitPrice = Number(bill.unitPrice);
     // Operating cost isn't stored per-bill; derive it from the original bill so
     // the correction only reflects the reading change.

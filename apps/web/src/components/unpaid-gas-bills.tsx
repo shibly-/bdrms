@@ -485,15 +485,57 @@ function UpdateBillModal({
   onClose: () => void;
   onUpdated: (newBillId: number) => void | Promise<void>;
 }) {
+  const previousReading = Number(bill.previousReading) || 0;
   const [currentReading, setCurrentReading] = useState(bill.currentReading);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState("");
+  const [lastPaidReading, setLastPaidReading] = useState<number | null>(
+    bill.lastPaidCurrentReading ?? null,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void adminFetch<GasBillDetailRow>(`/billing/bill/${bill.billId}`)
+      .then((row) => {
+        if (cancelled) return;
+        if (
+          row.lastPaidCurrentReading != null &&
+          Number.isFinite(Number(row.lastPaidCurrentReading))
+        ) {
+          setLastPaidReading(Number(row.lastPaidCurrentReading));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [bill.billId]);
+
+  const minAllowed = Math.max(previousReading, lastPaidReading ?? 0);
+  const minInput = Number((minAllowed + 0.001).toFixed(3));
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!reason.trim()) {
       setErr("An update reason is required.");
+      return;
+    }
+    const nextReading = Number(currentReading);
+    if (!Number.isFinite(nextReading) || nextReading < 0) {
+      setErr("Current reading must be a non-negative number.");
+      return;
+    }
+    if (lastPaidReading != null && nextReading <= lastPaidReading) {
+      setErr(
+        `Current reading must be higher than the last paid bill's current reading (${lastPaidReading}).`,
+      );
+      return;
+    }
+    if (nextReading <= previousReading) {
+      setErr(
+        "Current reading must be greater than previous reading.",
+      );
       return;
     }
     setSubmitting(true);
@@ -504,7 +546,7 @@ function UpdateBillModal({
         {
           method: "POST",
           body: JSON.stringify({
-            currentReading: Number(currentReading),
+            currentReading: nextReading,
             updateReason: reason.trim(),
           }),
         },
@@ -563,6 +605,18 @@ function UpdateBillModal({
               className="w-full rounded-md border border-zinc-200 bg-zinc-100 p-2 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800"
             />
           </div>
+          {lastPaidReading != null ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                Last paid current reading (m³)
+              </label>
+              <input
+                disabled
+                value={lastPaidReading}
+                className="w-full rounded-md border border-zinc-200 bg-zinc-100 p-2 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800"
+              />
+            </div>
+          ) : null}
           <div>
             <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-200">
               Current reading (m³)
@@ -570,12 +624,21 @@ function UpdateBillModal({
             <input
               type="number"
               step="0.001"
-              min="0"
+              min={minInput}
               required
               value={currentReading}
               onChange={(e) => setCurrentReading(e.target.value)}
               className="w-full rounded-md border border-zinc-300 p-2 dark:border-zinc-700 dark:bg-zinc-900"
             />
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              {lastPaidReading != null
+                ? `Must be higher than the last paid bill's current reading (${lastPaidReading})${
+                    previousReading > lastPaidReading
+                      ? ` and the previous reading (${bill.previousReading})`
+                      : ""
+                  }.`
+                : `Must be higher than the previous reading (${bill.previousReading}).`}
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-200">

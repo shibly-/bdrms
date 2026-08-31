@@ -4,7 +4,7 @@ import { BookOpen, Building2, ReceiptText, UserCog, Fuel, Milk, ArrowBigRight } 
 
 export default function Home() {
   return (
-    <main className="rounded-2xl border border-zinc-200 mx-auto flex min-h-screen max-w-5xl flex-col justify-center gap-4 px-4 py-8 dark:text-zinc-50">
+    <main className="rms-main-container rounded-2xl border border-zinc-200 mx-auto flex min-h-screen max-w-5xl flex-col justify-center gap-4 px-4 py-8 dark:text-zinc-50">
 
       <section className="flex flex-wrap items-center justify-center gap-3">
         <div className="flex items-center gap-2">
