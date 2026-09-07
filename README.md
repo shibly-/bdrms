@@ -8,7 +8,7 @@ Web portals, a NestJS API, and an optional Expo app share one PostgreSQL databas
 
 - **Web:** Next.js 16 (App Router, React 19) + Tailwind CSS + Lucide
 - **Mobile:** Expo (React Native) — resident login, unit price, billing history
-- **API:** NestJS 11, modular (`auth`, `admin`, `billing`, `management`, `database`)
+- **API:** NestJS 11, modular (`auth`, `admin`, `billing`, `loads`, `management`, `database`)
 - **Data:** PostgreSQL + Drizzle ORM
 - **Auth:** JWT + RBAC (`admin`, `building_admin`, `staff`, `user`)
 - **Meter OCR (web):** Tesseract.js on the client; reading stays editable
@@ -38,6 +38,7 @@ flowchart TB
   subgraph api [NestJS /api]
     Auth[Auth + JWT + RBAC]
     Admin[Admin CRUD]
+    Loads[Loads + unit cost]
     Billing[Billing service]
   end
   DB[(PostgreSQL via Drizzle)]
@@ -45,9 +46,12 @@ flowchart TB
   Web --> Auth
   Mobile --> Auth
   Auth --> Admin
+  Auth --> Loads
   Auth --> Billing
   Admin --> DB
+  Loads --> DB
   Billing --> DB
+  Loads -.->|gas price per building| Billing
 ```
 
 ### 1. Property and people
@@ -56,9 +60,65 @@ flowchart TB
 2. **Admin** (or building admin) creates flats under a building; flat no is unique per building.
 3. **Admin** (or building admin) creates **staff** and **standard users** (residents). Resident forms filter flats by building and copy address from the building.
 4. Residents may also **self-register** (`/register`) against an active building and flat, with a unique gas meter number.
-5. **Admin only** sets **system config**: gas unit name, unit price (per kg), and operating cost per flat.
+5. **Admin only** maintains **Unit Cost** per building (under **Loads**). Gas price is derived from that building’s current load; operating cost per flat is stored on the building’s config row.
 
-### 2. Generate a gas bill
+### 2. Loads and unit cost
+
+The **Loads** menu is shared by admin and staff (except Unit Cost, which is admin-only).
+
+| Page | Route | Who | Purpose |
+| --- | --- | --- | --- |
+| Current Load | `/admin/current-load`, `/staff/current-load` | Admin, building admin, staff | Record the running LPG load **for a selected building** |
+| Loading History | `/admin/loading-history`, `/staff/loading-history` | Admin, building admin, staff | Running, Consumed, and Cancelled loads, with prices, filters, PDF/CSV |
+| Usage | `/admin/usage`, `/staff/usage` | Admin, building admin, staff | Usage chart by building (residents see their own unit) |
+| Unit Cost | `/admin/unit-cost` | **Admin only** | Per-building gas unit setup used when generating bills |
+
+Old `/admin/config` redirects to `/admin/unit-cost`. Building admin does not see Unit Cost (or Buildings) in the nav.
+
+#### Current Load
+
+- A **building is required**. Quantity (KG) and cost (BDT) are stored against that building.
+- At most **one Running load per building** (`uq_loads_one_running_per_building`).
+- **Update** inserts a new Running row. If that building already had a Running load, the previous row is **Cancelled** and linked (`previousLoadId` / `supersededByLoadId`).
+- **Consumed** marks the building’s Running load as Consumed. Enter a new load when the next cylinder/tank is received.
+- Status, loading date, and update date are read-only.
+
+#### Loading History
+
+- Lists **Running**, **Consumed**, and **Cancelled** loads.
+- **Building** filter (plus loading/update date range). The table includes a Building column.
+- Each row shows **Gas Price Per KG** = cost ÷ quantity (2 decimals) and **Gas Price Per m³** = KG price × **1.8315** (2 decimals).
+- Sort by Id, Status, Loading Date, or Update Date. Print PDF / Download CSV include Building and both prices.
+
+#### Unit Cost (per building)
+
+Each building has its own `system_configs` row (`building_id` unique). Creating a building seeds a config row.
+
+| Field | Editable | How it is set |
+| --- | --- | --- |
+| Building | Yes (selector) | Required; loads and saves that building’s row |
+| Gas Unit Name | No | Copied from config (typically `m3`) |
+| Gas Price Per KG | No | From that building’s **Running** load: `costBdt ÷ quantityKg`. If none is running, the last **Consumed** load. If the building has no load, **1**. Rounded to 2 decimals. |
+| Gas Price Per m³ | No | `Gas Price Per KG × 1.8315`, rounded to 2 decimals |
+| Operating Cost Per Flat | Yes | Stored per building; used on every new bill for flats in that building |
+
+Saving Unit Cost writes the operating cost (and refreshes the derived KG price). It does **not** let you type a gas price; change the building’s Current Load instead.
+
+#### Effect on billing
+
+Bill Entry and Bulk Bill Entry show a rates header for the **selected building** (KG, m³, operating cost). Totals use that building’s derived unit price and operating cost. Residents without a building picker use the building on their profile.
+
+```
+gasPricePerKg (building) = running load cost/qty
+                         or last consumed load cost/qty
+                         or 1
+gasPricePerM3            = gasPricePerKg × 1.8315
+totalBill                = usageKg × gasPricePerKg + operatingCostPerFlat
+```
+
+The KG price and operating cost are **copied onto the bill** at generation time. Later load or Unit Cost changes do not rewrite old bills.
+
+### 3. Generate a gas bill
 
 ```mermaid
 flowchart LR
@@ -71,13 +131,13 @@ flowchart LR
   F --> G[Persist unpaid bill]
 ```
 
-- **Admin** and **staff** use Gas Billing Form (one flat) or Bulk Gas Billing (one building).
+- **Admin** and **staff** use **Bill Entry** (one flat) or **Bulk Bill Entry** (one building). Rates and totals follow the selected building’s Unit Cost / Current Load.
 - Previous reading is the **current reading of that resident’s latest bill**, or `0` if none exists.
 - Current reading **must be strictly greater** than previous reading.
 - New bills are stored as **`unpaid`**. Billing date is a timestamp (date-only input is combined with server time).
 - Optional meter image is stored on the bill (payload size is capped).
 
-### 3. Collect payment and correct readings
+### 4. Collect payment and correct readings
 
 ```mermaid
 stateDiagram-v2
@@ -88,15 +148,16 @@ stateDiagram-v2
   paid --> [*]
 ```
 
-- **Unpaid Gas Bills:** list outstanding bills. **Admin only** can **Mark as Paid** or **Update**.
+- **Unpaid Bills:** list outstanding bills. **Admin only** can **Mark as Paid** or **Update**.
 - **Staff** can view unpaid bills but cannot mark paid or edit readings.
+- **Mark as Paid** is allowed only on that resident’s **oldest unpaid bill** (earliest billing date, then lowest bill id). Newer unpaid bills stay payable only after older ones are paid. The API rejects paying a newer bill even if filters hide the older one.
 - **Update (admin):** only **current reading** changes, with a required reason (max 200 characters). The old bill becomes **`cancelled`**. A new **`unpaid`** bill is inserted with the new totals, `updateReason`, `billUpdatedAt`, `previousBillId` (the cancelled bill), and `createdByUserId`. The cancelled bill gets `supersededByBillId`.
 - On update, current reading must be **higher than the last paid bill’s current reading** (when a paid bill exists) **and** greater than this bill’s previous reading.
 - **Gas Billing History:** unpaid, paid, and cancelled bills, with links between cancelled and replacement bills. Residents see **only their own** history.
 
-### 4. Resident view
+### 5. Resident view
 
-Residents sign in on web (`/user`) or mobile, see current unit price and operating cost, profile, and personal billing history.
+Residents sign in on web (`/user`) or mobile, see **their building’s** current gas price (from that building’s load) and operating cost, plus profile and personal billing history.
 
 ## Billing logic
 
@@ -113,7 +174,7 @@ totalBill          = usageKg × unitPrice + operatingCostPerFlat
 ```
 
 - `previousReading` defaults to `0` when there is no prior bill.
-- `unitPrice` and `operatingCostPerFlat` come from `system_configs` (latest row) at generation time and are **copied onto the bill**. Later config changes do not rewrite old bills.
+- `unitPrice` is the selected **building’s** Gas Price Per KG (from Current Load; see Loads above). `operatingCostPerFlat` comes from that building’s `system_configs` row. Both are **copied onto the bill** at generation time. Later load or Unit Cost changes do not rewrite old bills.
 - On an unpaid-bill **update**, operating cost is **derived from the original bill** so the correction only reflects the reading change:
 
 ```
@@ -129,11 +190,12 @@ then `calculate()` is run again with the new current reading.
 | Current reading ≥ 0 and finite | Create and update |
 | Current reading **>** previous reading | Create; also on update |
 | Current reading **>** last **paid** bill’s current reading | Update unpaid bill (if a paid bill exists) |
-| Gas unit price must be configured and > 0 | Create |
-| Building must be active | Create (flat context) |
+| Gas unit price must be configured and > 0 | Create (derived from the building’s load, default 1 if no load) |
+| Building must be active | Create (flat context); also Current Load |
 | Duplicate protection | Same meter, same calendar day, same previous/current/total, status not `cancelled` |
 | Update reason required, ≤ 200 characters | Update unpaid bill |
 | Only `unpaid` bills can be marked paid or updated | Mark paid / update |
+| Only the resident’s **oldest unpaid** bill can be marked paid | Mark paid |
 
 `usageQuantity` stored on the bill is **m³** (not kg). Kg is used only when computing `totalBill`.
 
@@ -150,7 +212,8 @@ Web billing forms can run Tesseract.js on a meter photo and fill current reading
 | Capability | Admin | Building admin | Staff | Resident |
 | --- | --- | --- | --- | --- |
 | Buildings CRUD, enable/disable | Yes | No | No | No |
-| System config (prices) | Yes | No | No | No |
+| Unit Cost (per-building prices) | Yes | No | No | No |
+| Current Load / Loading History / Usage | Yes | Yes | Yes | No |
 | Flats, staff, standard users | Yes | Yes | No | No |
 | Generate bills (single + bulk) | Yes | Yes | Yes | No |
 | Unpaid list | Yes | Yes | View only | No |
@@ -158,7 +221,7 @@ Web billing forms can run Tesseract.js on a meter photo and fill current reading
 | Billing history | All meters | All meters | All meters | Own bills only |
 | Register / profile | — | — | Own profile | Own profile |
 
-\*Mark-paid and unpaid update are `@Roles(Admin)` only (not `building_admin`). Building admin uses the admin web shell but without Buildings and Configuration in the nav.
+\*Mark-paid and unpaid update are `@Roles(Admin)` only (not `building_admin`). Only the oldest unpaid bill per resident can be marked paid. Building admin uses the admin web shell but without Buildings and Unit Cost in the nav.
 
 JWT payload: `{ sub, userName, role }`. Web and mobile store `accessToken` and `userRole` in local storage and send `Authorization: Bearer …`.
 
@@ -171,7 +234,9 @@ If no `users` row matches the login name, the API currently issues a **demo JWT*
 - **Guards:** `JwtAuthGuard` + `RolesGuard` on protected controllers.
 - **Passwords:** scrypt hashes in `users.password_hash`.
 - **Disabled buildings:** excluded from registration lists; billing a flat in a disabled building is rejected.
-- **Exports:** unpaid list and history support CSV and PDF (jsPDF) on the web.
+- **Exports:** unpaid list, billing history, and loading history support CSV and PDF (jsPDF) on the web.
+- **Loads table:** `building_id` required; statuses `running` \| `consumed` \| `cancelled`; one Running load per building.
+- **System config:** one row per building (`uq_system_configs_building`). Gas price on the row is kept in sync from that building’s load; billing always re-derives KG price from loads at generate time.
 - **Bill detail:** shows readings, totals, status, optional meter image, update reason, update time, and links to previous / superseding bills.
 
 ## Quick start
