@@ -432,7 +432,12 @@ export function UnpaidGasBills({ buildingsEndpoint, isAdmin }: Props) {
                             </button>
                             <button
                               type="button"
-                              disabled={busyId === r.billId}
+                              disabled={busyId === r.billId || r.canMarkPaid === false}
+                              title={
+                                r.canMarkPaid === false
+                                  ? "Only the oldest unpaid bill for this resident can be marked as paid."
+                                  : undefined
+                              }
                               onClick={() => markPaid(r.billId)}
                               className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                             >

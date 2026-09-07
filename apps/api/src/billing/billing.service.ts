@@ -877,6 +877,7 @@ export class BillingService {
     const rows = await this.db
       .select({
         billId: schema.bills.id,
+        standardUserId: schema.bills.standardUserId,
         billingDate: schema.bills.billingDate,
         previousReading: schema.bills.previousReading,
         currentReading: schema.bills.currentReading,
@@ -923,9 +924,23 @@ export class BillingService {
       .innerJoin(schema.users, eq(schema.standardUserProfiles.userId, schema.users.id))
       .where(whereExpr);
 
+    const unpaidUserIds = [
+      ...new Set(
+        rows
+          .filter((r) => r.status === 'unpaid')
+          .map((r) => r.standardUserId),
+      ),
+    ];
+    const oldestUnpaidByUser = await this.oldestUnpaidBillIds(unpaidUserIds);
+
     return {
       total: total[0]?.count ?? 0,
-      items: rows,
+      items: rows.map((row) => ({
+        ...row,
+        canMarkPaid:
+          row.status === 'unpaid' &&
+          oldestUnpaidByUser.get(row.standardUserId) === row.billId,
+      })),
     };
   }
 
@@ -1010,13 +1025,48 @@ export class BillingService {
     return Number(lastPaid.currentReading ?? 0);
   }
 
+  /**
+   * Oldest unpaid bill id per resident, ordered by billing date then id.
+   */
+  private async oldestUnpaidBillIds(
+    standardUserIds: number[],
+  ): Promise<Map<number, number>> {
+    const oldest = new Map<number, number>();
+    if (standardUserIds.length === 0) {
+      return oldest;
+    }
+    const unpaid = await this.db
+      .select({
+        id: schema.bills.id,
+        standardUserId: schema.bills.standardUserId,
+      })
+      .from(schema.bills)
+      .where(
+        and(
+          eq(schema.bills.status, 'unpaid'),
+          inArray(schema.bills.standardUserId, standardUserIds),
+        ),
+      )
+      .orderBy(asc(schema.bills.billingDate), asc(schema.bills.id));
+    for (const row of unpaid) {
+      if (!oldest.has(row.standardUserId)) {
+        oldest.set(row.standardUserId, row.id);
+      }
+    }
+    return oldest;
+  }
+
   /** Marks an unpaid bill as paid. Admin-only (enforced at the controller). */
   async markBillPaid(billId: number) {
     if (!Number.isFinite(billId) || billId < 1) {
       throw new BadRequestException('Invalid bill id');
     }
     const [bill] = await this.db
-      .select({ id: schema.bills.id, status: schema.bills.status })
+      .select({
+        id: schema.bills.id,
+        status: schema.bills.status,
+        standardUserId: schema.bills.standardUserId,
+      })
       .from(schema.bills)
       .where(eq(schema.bills.id, billId))
       .limit(1);
@@ -1026,6 +1076,13 @@ export class BillingService {
     if (bill.status !== 'unpaid') {
       throw new BadRequestException(
         `Only unpaid bills can be marked as paid (current status: ${bill.status})`,
+      );
+    }
+    const oldestByUser = await this.oldestUnpaidBillIds([bill.standardUserId]);
+    const oldestId = oldestByUser.get(bill.standardUserId);
+    if (oldestId != null && oldestId !== bill.id) {
+      throw new BadRequestException(
+        `Only the oldest unpaid bill (#${oldestId}) for this resident can be marked as paid.`,
       );
     }
     await this.db

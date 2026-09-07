@@ -44,14 +44,21 @@ export function BillingRatesHeader({ buildingId }: Props) {
       setConfig(null);
       return;
     }
+    let cancelled = false;
     void adminFetch<UnitConfig>(`/billing/unit-config?buildingId=${selectedId}`)
-      .then((data) =>
+      .then((data) => {
+        if (cancelled) return;
         setConfig({
           gasUnitPrice: Number(data.gasUnitPrice || 0),
           operatingCostPerFlat: Number(data.operatingCostPerFlat || 0),
-        }),
-      )
-      .catch(() => setConfig(null));
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setConfig(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedId]);
 
   const priceKg = config?.gasUnitPrice ?? null;

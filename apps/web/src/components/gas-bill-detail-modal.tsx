@@ -41,6 +41,8 @@ export type GasBillDetailRow = {
   createdAt?: string | null;
   /** Current reading of the user's most recent paid bill, if any. */
   lastPaidCurrentReading?: number | null;
+  /** True when this is the resident's oldest unpaid bill. */
+  canMarkPaid?: boolean;
 };
 
 type Props = {
