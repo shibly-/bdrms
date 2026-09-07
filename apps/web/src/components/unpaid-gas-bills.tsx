@@ -305,7 +305,7 @@ export function UnpaidGasBills({ buildingsEndpoint, isAdmin }: Props) {
             <button
               type="button"
               onClick={() =>
-                downloadBillingHistoryCsv(sortedRows, "unpaid-gas-bills")
+                downloadBillingHistoryCsv(sortedRows, "unpaid-bills")
               }
               disabled={sortedRows.length === 0}
               className={exportBtn}

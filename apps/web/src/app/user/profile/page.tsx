@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { adminFetch } from "@/lib/admin-client";
+import { USER_NAV } from "@/lib/user-nav";
 
 type ResidentProfileResponse = {
   user: {
@@ -94,11 +95,7 @@ export default function ResidentProfilePage() {
     <AppShell
       title="Resident Profile"
       subtitle="Your account and residence details (read-only)."
-      menu={[
-        { href: "/user", label: "Overview" },
-        { href: "/user/profile", label: "Profile" },
-        { href: "/user/gas-billing-history", label: "Gas Billing History" },
-      ]}
+      menu={USER_NAV}
     >
       {loading ? (
         <section className="rounded-2xl border border-zinc-200 bg-white p-5 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">

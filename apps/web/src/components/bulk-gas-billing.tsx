@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { BillingRatesHeader } from "@/components/billing-rates-header";
 import { adminFetch } from "@/lib/admin-client";
 import {
   billingAlertErr,
@@ -185,7 +186,8 @@ export function BulkGasBillingForm({ buildingsEndpoint }: Props) {
 
       <form onSubmit={submit} className="space-y-3">
         <section className={billingSection}>
-          <div className="grid gap-2 md:grid-cols-3">
+          <BillingRatesHeader buildingId={buildingId} />
+          <div className="mt-2 grid gap-2 md:grid-cols-2">
             <label className={billingLabel}>
               Building
               <select
@@ -211,18 +213,6 @@ export function BulkGasBillingForm({ buildingsEndpoint }: Props) {
                 readOnly
                 disabled
                 title="The reading date is fixed to today and cannot be changed."
-              />
-            </label>
-            <label className={billingLabel}>
-              Unit Price / Operating Cost
-              <input
-                className={billingInputReadonly}
-                value={
-                  ctx
-                    ? `${formatMoney(unitPrice)} / ${formatMoney(operatingCostPerFlat)}`
-                    : "—"
-                }
-                readOnly
               />
             </label>
           </div>

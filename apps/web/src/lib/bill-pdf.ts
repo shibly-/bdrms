@@ -429,10 +429,10 @@ function downloadBillingListPdf(
 /** Downloads the unpaid-bills list (as currently displayed/sorted) as one PDF. */
 export function downloadUnpaidBillsPdf(
   rows: GasBillDetailRow[],
-  fileName = "unpaid-gas-bills",
+  fileName = "unpaid-bills",
 ): void {
   downloadBillingListPdf(rows, {
-    title: "Unpaid Gas Bills",
+    title: "Unpaid Bills",
     fileName,
     countLabel: "unpaid bill(s)",
     cols: unpaidListColumns(),
@@ -446,7 +446,7 @@ export function downloadBillingHistoryPdf(
 ): void {
   downloadBillingListPdf(rows, {
     title: "Billing List",
-    fileName: options?.fileName ?? "gas-billing-history",
+    fileName: options?.fileName ?? "billing-history",
     countLabel: "bill(s)",
     cols: historyListColumns(options?.showUser ?? true),
   });

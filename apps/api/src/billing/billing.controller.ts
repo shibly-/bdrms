@@ -95,8 +95,26 @@ export class BillingController {
 
   @Get('unit-config')
   @Roles(...ADMIN_STAFF_USER_ROLES)
-  getUnitConfig() {
-    return this.billingService.getCurrentUnitConfig();
+  async getUnitConfig(
+    @Query('buildingId') buildingId?: string,
+    @Req() req?: { user?: { sub?: number; userName?: string; role?: string } },
+  ) {
+    const parsed = Number(buildingId);
+    if (Number.isFinite(parsed) && parsed >= 1) {
+      return this.billingService.getCurrentUnitConfig(parsed);
+    }
+    if (req?.user?.role === UserRole.User) {
+      const scope = await this.billingService.resolveResidentUsageScope(
+        req.user.sub,
+        req.user.userName,
+      );
+      return this.billingService.getCurrentUnitConfig(scope.buildingId);
+    }
+    return {
+      gasUnitName: 'Gas Unit',
+      gasUnitPrice: 0,
+      operatingCostPerFlat: 0,
+    };
   }
 
   @Get('monthly')
@@ -110,6 +128,35 @@ export class BillingController {
       month: targetMonth,
     });
     return { month: targetMonth, ...history };
+  }
+
+  @Get('usage')
+  @Roles(...ADMIN_STAFF_USER_ROLES)
+  async getUsage(
+    @Req()
+    req: { user?: { role?: UserRole; sub?: number; userName?: string } },
+    @Query('buildingId') buildingId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('granularity') granularity?: string,
+  ) {
+    const isResident = req.user?.role === UserRole.User;
+    const scope = isResident
+      ? await this.billingService.resolveResidentUsageScope(
+          req.user?.sub,
+          req.user?.userName,
+        )
+      : {
+          buildingId: Number(buildingId),
+          flatId: undefined as number | undefined,
+        };
+    return this.billingService.getUsageChart({
+      buildingId: scope.buildingId,
+      flatId: scope.flatId,
+      startDate: startDate ?? '',
+      endDate: endDate ?? '',
+      granularity: granularity === 'weekly' ? 'weekly' : 'monthly',
+    });
   }
 
   @Get('history')

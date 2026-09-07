@@ -10,11 +10,11 @@ function csvCell(value: unknown): string {
 
 /**
  * Downloads the given billing rows (as currently displayed/sorted) as a CSV
- * file. Used by the "Download" button on the Gas Billing History pages.
+ * file. Used by the "Download" button on the Billing History pages.
  */
 export function downloadBillingHistoryCsv(
   rows: GasBillDetailRow[],
-  fileName = "gas-billing-history",
+  fileName = "billing-history",
 ) {
   const headers = [
     "Bill ID",

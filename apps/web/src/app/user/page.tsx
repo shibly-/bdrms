@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { adminFetch } from "@/lib/admin-client";
+import { USER_NAV } from "@/lib/user-nav";
 
 export default function UserPage() {
   const [unitName, setUnitName] = useState("Gas Unit");
@@ -24,11 +25,7 @@ export default function UserPage() {
     <AppShell
       title="PRRMS - LPG Gas Billing System"
       subtitle="Check your current gas bill and previous billing history..."
-      menu={[
-        { href: "/user", label: "Overview" },
-        { href: "/user/profile", label: "User Profile" },
-        { href: "/user/gas-billing-history", label: "Gas Billing History" },
-      ]}
+      menu={USER_NAV}
     >
       {err ? (
         <section className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-200">

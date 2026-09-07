@@ -85,10 +85,10 @@ export default function AdminPage() {
           <QuickLink href="/admin/flats" icon={<Building2 className="h-3.5 w-3.5" />} title="Flat/Apartment Management" />
           <QuickLink href="/admin/users" icon={<UserRound className="h-3.5 w-3.5" />} title="Standard User Management" />
           <QuickLink href="/admin/staff" icon={<Users className="h-3.5 w-3.5" />} title="Staff User Management" />
-          <QuickLink href="/admin/gas-billing-form" icon={<ReceiptText className="h-3.5 w-3.5" />} title="Gas Billing Form" />
-          <QuickLink href="/admin/gas-billing-history" icon={<ReceiptText className="h-3.5 w-3.5" />} title="Gas Billing History" />
+          <QuickLink href="/admin/bill-entry" icon={<ReceiptText className="h-3.5 w-3.5" />} title="Bill Entry" />
+          <QuickLink href="/admin/billing-history" icon={<ReceiptText className="h-3.5 w-3.5" />} title="Billing History" />
           {isBuildingAdmin ? null : (
-            <QuickLink href="/admin/config" icon={<Settings className="h-3.5 w-3.5" />} title="Configuration Page" />
+            <QuickLink href="/admin/unit-cost" icon={<Settings className="h-3.5 w-3.5" />} title="Unit Cost" />
           )}
         </section>
       ) : null}

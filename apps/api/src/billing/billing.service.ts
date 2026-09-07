@@ -5,12 +5,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, desc, eq, gte, ilike, inArray, lt, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, lt, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { BillingPreview } from '../common/types';
+import { BillingPreview, UserRole } from '../common/types';
 import { DRIZZLE } from '../database/database.module';
 import * as schema from '../database/schema';
+import { LoadsService } from '../loads/loads.service';
 
 export type GenerateBillInput = {
   previousReading?: number | null;
@@ -102,11 +103,121 @@ function nextCalendarDay(yyyyMmDd: string): string {
   return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
 }
 
+export type UsageGranularity = 'weekly' | 'monthly';
+
+export type UsageChartResult = {
+  buildingId: number;
+  buildingName: string;
+  buildingNo: string | null;
+  granularity: UsageGranularity;
+  startDate: string;
+  endDate: string;
+  unit: 'm3';
+  periods: { key: string; label: string }[];
+  series: { flatId: number; flatNo: string; values: number[] }[];
+};
+
+function isIsoDate(value?: string | null): value is string {
+  return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function parseUtcDate(yyyyMmDd: string): Date {
+  const [y, m, d] = yyyyMmDd.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+function isoDate(d: Date): string {
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+function addUtcDays(yyyyMmDd: string, days: number): string {
+  const dt = parseUtcDate(yyyyMmDd);
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return isoDate(dt);
+}
+
+function monthKey(yyyyMmDd: string): string {
+  return yyyyMmDd.slice(0, 7);
+}
+
+function addUtcMonths(yyyyMm: string, months: number): string {
+  const [y, m] = yyyyMm.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1 + months, 1));
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}`;
+}
+
+/** Monday of the ISO week containing YYYY-MM-DD (UTC). */
+function mondayOf(yyyyMmDd: string): string {
+  const dt = parseUtcDate(yyyyMmDd);
+  const day = dt.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  dt.setUTCDate(dt.getUTCDate() + diff);
+  return isoDate(dt);
+}
+
+function monthLabel(yyyyMm: string): string {
+  const [y, m] = yyyyMm.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleString('en-GB', {
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function weekLabel(monday: string): string {
+  const sunday = addUtcDays(monday, 6);
+  const start = parseUtcDate(monday);
+  const end = parseUtcDate(sunday);
+  const startDay = start.getUTCDate();
+  const endDay = end.getUTCDate();
+  const startMon = start.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
+  const endMon = end.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
+  if (startMon === endMon) {
+    return `${startDay}–${endDay} ${startMon}`;
+  }
+  return `${startDay} ${startMon}–${endDay} ${endMon}`;
+}
+
+function enumerateUsagePeriods(
+  startDate: string,
+  endDate: string,
+  granularity: UsageGranularity,
+): { key: string; label: string }[] {
+  const periods: { key: string; label: string }[] = [];
+  if (granularity === 'monthly') {
+    let current = monthKey(startDate);
+    const last = monthKey(endDate);
+    while (current <= last) {
+      periods.push({ key: current, label: monthLabel(current) });
+      current = addUtcMonths(current, 1);
+    }
+    return periods;
+  }
+  let current = mondayOf(startDate);
+  const last = mondayOf(endDate);
+  while (current <= last) {
+    periods.push({ key: current, label: weekLabel(current) });
+    current = addUtcDays(current, 7);
+  }
+  return periods;
+}
+
+function periodKeyForBillingDate(
+  billingDate: string,
+  granularity: UsageGranularity,
+): string {
+  const dateOnly = billingDate.slice(0, 10);
+  return granularity === 'monthly' ? monthKey(dateOnly) : mondayOf(dateOnly);
+}
+
 type Db = PostgresJsDatabase<typeof schema>;
 
 @Injectable()
 export class BillingService {
-  constructor(@Inject(DRIZZLE) private readonly db: Db) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Db,
+    private readonly loadsService: LoadsService,
+  ) {}
 
   calculate(input: GenerateBillInput): BillingPreview {
     const previous = input.previousReading ?? 0;
@@ -189,14 +300,7 @@ export class BillingService {
       .orderBy(desc(schema.bills.billingDate), desc(schema.bills.id))
       .limit(1);
 
-    const [config] = await this.db
-      .select({
-        gasUnitPrice: schema.systemConfigs.gasUnitPrice,
-        operatingCostPerFlat: schema.systemConfigs.operatingCostPerFlat,
-      })
-      .from(schema.systemConfigs)
-      .orderBy(desc(schema.systemConfigs.id))
-      .limit(1);
+    const costs = await this.unitCostsForBuilding(profile.buildingId);
 
     return {
       standardUserId: profile.standardUserId,
@@ -213,10 +317,8 @@ export class BillingService {
       previousReading: latestBill?.currentReading
         ? Number(latestBill.currentReading)
         : 0,
-      unitPrice: config?.gasUnitPrice ? Number(config.gasUnitPrice) : 0,
-      operatingCostPerFlat: config?.operatingCostPerFlat
-        ? Number(config.operatingCostPerFlat)
-        : 0,
+      unitPrice: costs.gasUnitPrice,
+      operatingCostPerFlat: costs.operatingCostPerFlat,
     };
   }
 
@@ -342,14 +444,7 @@ export class BillingService {
       throw new BadRequestException('This building is disabled');
     }
 
-    const [config] = await this.db
-      .select({
-        gasUnitPrice: schema.systemConfigs.gasUnitPrice,
-        operatingCostPerFlat: schema.systemConfigs.operatingCostPerFlat,
-      })
-      .from(schema.systemConfigs)
-      .orderBy(desc(schema.systemConfigs.id))
-      .limit(1);
+    const costs = await this.unitCostsForBuilding(buildingId);
 
     const profiles = await this.db
       .select({
@@ -396,10 +491,8 @@ export class BillingService {
     return {
       building,
       billingDate: today(),
-      unitPrice: config?.gasUnitPrice ? Number(config.gasUnitPrice) : 0,
-      operatingCostPerFlat: config?.operatingCostPerFlat
-        ? Number(config.operatingCostPerFlat)
-        : 0,
+      unitPrice: costs.gasUnitPrice,
+      operatingCostPerFlat: costs.operatingCostPerFlat,
       flats: profiles.map((p) => ({
         standardUserId: p.standardUserId,
         flatId: p.flatId,
@@ -520,29 +613,231 @@ export class BillingService {
     };
   }
 
-  async getCurrentUnitConfig() {
+  async getCurrentUnitConfig(buildingId: number) {
+    return this.unitCostsForBuilding(buildingId);
+  }
+
+  private async unitCostsForBuilding(buildingId: number) {
+    const gasUnitPrice = await this.loadsService.resolveGasPricePerKg(buildingId);
     const [config] = await this.db
       .select({
         gasUnitName: schema.systemConfigs.gasUnitName,
-        gasUnitPrice: schema.systemConfigs.gasUnitPrice,
-        operatingCostPerFlat: schema.systemConfigs.operatingCostPerFlat
+        operatingCostPerFlat: schema.systemConfigs.operatingCostPerFlat,
       })
       .from(schema.systemConfigs)
-      .orderBy(desc(schema.systemConfigs.id))
+      .where(eq(schema.systemConfigs.buildingId, buildingId))
       .limit(1);
 
-    if (!config) {
-      return {
-        gasUnitName: 'Gas Unit',
-        gasUnitPrice: 0,
-        operatingCostPerFlat: 0,
-      };
+    return {
+      gasUnitName: config?.gasUnitName ?? 'Gas Unit',
+      gasUnitPrice,
+      operatingCostPerFlat: config
+        ? Number(config.operatingCostPerFlat)
+        : 1,
+    };
+  }
+
+  /**
+   * Resolves a standard user's building and flat from the JWT identity.
+   * Residents cannot choose a building; usage is always their own unit.
+   */
+  async resolveResidentUsageScope(
+    userId?: number,
+    userName?: string | null,
+  ): Promise<{ buildingId: number; flatId: number }> {
+    const userColumns = {
+      id: schema.users.id,
+    };
+
+    const byId =
+      userId != null && Number.isFinite(userId) && userId >= 1
+        ? await this.db
+            .select(userColumns)
+            .from(schema.users)
+            .where(
+              and(
+                eq(schema.users.id, userId),
+                eq(schema.users.role, UserRole.User),
+              ),
+            )
+            .limit(1)
+        : [];
+
+    let user = byId[0];
+    const trimmedUserName = userName?.trim();
+    if (!user && trimmedUserName) {
+      const byName = await this.db
+        .select(userColumns)
+        .from(schema.users)
+        .where(
+          and(
+            eq(
+              sql`lower(${schema.users.userName})`,
+              trimmedUserName.toLowerCase(),
+            ),
+            eq(schema.users.role, UserRole.User),
+          ),
+        )
+        .limit(1);
+      user = byName[0];
     }
 
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const [profile] = await this.db
+      .select({
+        buildingId: schema.standardUserProfiles.buildingId,
+        flatId: schema.standardUserProfiles.flatId,
+      })
+      .from(schema.standardUserProfiles)
+      .where(eq(schema.standardUserProfiles.userId, user.id))
+      .limit(1);
+
+    if (!profile) {
+      throw new NotFoundException('No residence profile found for this user');
+    }
+
+    return { buildingId: profile.buildingId, flatId: profile.flatId };
+  }
+
+  /**
+   * Per-flat consumption (m³) for a building, bucketed weekly or monthly.
+   * Consumption is current meter reading minus previous reading. Cancelled
+   * (superseded) bills are excluded so corrections are not double-counted.
+   */
+  async getUsageChart(input: {
+    buildingId: number;
+    flatId?: number;
+    startDate: string;
+    endDate: string;
+    granularity: UsageGranularity;
+  }): Promise<UsageChartResult> {
+    const buildingId = Number(input.buildingId);
+    if (!Number.isFinite(buildingId) || buildingId < 1) {
+      throw new BadRequestException('Invalid buildingId');
+    }
+    const scopedFlatId =
+      input.flatId != null && Number.isFinite(Number(input.flatId))
+        ? Number(input.flatId)
+        : undefined;
+    if (scopedFlatId != null && scopedFlatId < 1) {
+      throw new BadRequestException('Invalid flatId');
+    }
+    if (!isIsoDate(input.startDate) || !isIsoDate(input.endDate)) {
+      throw new BadRequestException('startDate and endDate must be YYYY-MM-DD');
+    }
+    if (input.startDate > input.endDate) {
+      throw new BadRequestException('startDate must be on or before endDate');
+    }
+    const granularity: UsageGranularity =
+      input.granularity === 'weekly' ? 'weekly' : 'monthly';
+
+    const [building] = await this.db
+      .select({
+        id: schema.buildings.id,
+        name: schema.buildings.name,
+        buildingNo: schema.buildings.buildingNo,
+        isActive: schema.buildings.isActive,
+      })
+      .from(schema.buildings)
+      .where(eq(schema.buildings.id, buildingId))
+      .limit(1);
+
+    if (!building) {
+      throw new NotFoundException('Building not found');
+    }
+    if (Number(building.isActive) === 0) {
+      throw new BadRequestException('This building is disabled');
+    }
+
+    const flats = await this.db
+      .select({
+        flatId: schema.flats.id,
+        flatNo: schema.flats.flatNo,
+      })
+      .from(schema.flats)
+      .where(
+        scopedFlatId != null
+          ? and(
+              eq(schema.flats.buildingId, buildingId),
+              eq(schema.flats.id, scopedFlatId),
+            )
+          : eq(schema.flats.buildingId, buildingId),
+      )
+      .orderBy(asc(schema.flats.flatNo));
+
+    if (scopedFlatId != null && flats.length === 0) {
+      throw new NotFoundException('Flat not found for this building');
+    }
+
+    const periods = enumerateUsagePeriods(
+      input.startDate,
+      input.endDate,
+      granularity,
+    );
+    const endExclusive = nextCalendarDay(input.endDate);
+
+    const billRows =
+      flats.length === 0
+        ? []
+        : await this.db
+            .select({
+              flatId: schema.flats.id,
+              billingDate: schema.bills.billingDate,
+              previousReading: schema.bills.previousReading,
+              currentReading: schema.bills.currentReading,
+            })
+            .from(schema.bills)
+            .innerJoin(
+              schema.standardUserProfiles,
+              eq(schema.bills.standardUserId, schema.standardUserProfiles.id),
+            )
+            .innerJoin(
+              schema.flats,
+              eq(schema.standardUserProfiles.flatId, schema.flats.id),
+            )
+            .where(
+              and(
+                eq(schema.flats.buildingId, buildingId),
+                scopedFlatId != null
+                  ? eq(schema.flats.id, scopedFlatId)
+                  : undefined,
+                gte(schema.bills.billingDate, input.startDate),
+                lt(schema.bills.billingDate, endExclusive),
+                ne(schema.bills.status, 'cancelled'),
+              ),
+            );
+
+    const totals = new Map<string, number>();
+    for (const row of billRows) {
+      const consumption = Math.max(
+        0,
+        Number(row.currentReading ?? 0) - Number(row.previousReading ?? 0),
+      );
+      const key = `${row.flatId}\0${periodKeyForBillingDate(String(row.billingDate), granularity)}`;
+      totals.set(key, (totals.get(key) ?? 0) + consumption);
+    }
+
+    const series = flats.map((flat) => ({
+      flatId: flat.flatId,
+      flatNo: flat.flatNo,
+      values: periods.map((period) =>
+        Number((totals.get(`${flat.flatId}\0${period.key}`) ?? 0).toFixed(3)),
+      ),
+    }));
+
     return {
-      gasUnitName: config.gasUnitName,
-      gasUnitPrice: Number(config.gasUnitPrice),
-      operatingCostPerFlat: Number(config.operatingCostPerFlat),
+      buildingId: building.id,
+      buildingName: building.name,
+      buildingNo: building.buildingNo,
+      granularity,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      unit: 'm3',
+      periods,
+      series,
     };
   }
 

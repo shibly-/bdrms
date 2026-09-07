@@ -5,12 +5,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { hashPassword } from '../auth/password.util';
 import { UserRole } from '../common/types';
 import { DRIZZLE } from '../database/database.module';
 import * as schema from '../database/schema';
+import { LoadsService } from '../loads/loads.service';
 
 type Db = PostgresJsDatabase<typeof schema>;
 
@@ -61,14 +62,18 @@ type CreateStaffDto = {
 type UpdateStaffDto = Partial<CreateStaffDto>;
 
 type SystemConfigDto = {
+  buildingId: number;
   gasUnitName: string;
-  gasUnitPrice: number;
+  gasUnitPrice?: number;
   operatingCostPerFlat?: number;
 };
 
 @Injectable()
 export class AdminService {
-  constructor(@Inject(DRIZZLE) private readonly db: Db) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: Db,
+    private readonly loadsService: LoadsService,
+  ) {}
 
   async getDashboardStats() {
     const [usersCount] = await this.db
@@ -139,6 +144,23 @@ export class AdminService {
         postCode: dto.postCode.trim(),
       })
       .returning();
+
+    const [template] = await this.db
+      .select({
+        gasUnitName: schema.systemConfigs.gasUnitName,
+        operatingCostPerFlat: schema.systemConfigs.operatingCostPerFlat,
+      })
+      .from(schema.systemConfigs)
+      .orderBy(schema.systemConfigs.id)
+      .limit(1);
+
+    await this.db.insert(schema.systemConfigs).values({
+      buildingId: row.id,
+      gasUnitName: template?.gasUnitName ?? 'm3',
+      gasUnitPrice: '1.00',
+      operatingCostPerFlat: template?.operatingCostPerFlat ?? '1.00',
+    });
+
     return row;
   }
 
@@ -494,25 +516,43 @@ export class AdminService {
     return { deleted: true };
   }
 
-  async getSystemConfig() {
+  async getSystemConfig(buildingId: number) {
+    if (!Number.isFinite(buildingId) || buildingId < 1) {
+      throw new BadRequestException('Building is required');
+    }
+    await this.loadsService.assertBuilding(buildingId);
     const [row] = await this.db
       .select()
       .from(schema.systemConfigs)
-      .orderBy(desc(schema.systemConfigs.id))
+      .where(eq(schema.systemConfigs.buildingId, buildingId))
       .limit(1);
-    if (!row) throw new NotFoundException('System config not found');
-    return row;
+    const gasUnitPrice =
+      await this.loadsService.applyGasPriceToSystemConfig(buildingId);
+    if (!row) {
+      return {
+        id: 0,
+        buildingId,
+        gasUnitName: 'm3',
+        gasUnitPrice: gasUnitPrice.toFixed(2),
+        operatingCostPerFlat: '1.00',
+      };
+    }
+    return { ...row, gasUnitPrice: gasUnitPrice.toFixed(2) };
   }
 
   async createSystemConfig(dto: SystemConfigDto) {
+    const buildingId = this.requireBuildingId(dto.buildingId);
+    await this.loadsService.assertBuilding(buildingId);
     this.requireText(dto.gasUnitName, 'gasUnitName');
-    this.requirePositiveNumber(dto.gasUnitPrice, 'gasUnitPrice');
     const operatingCostPerFlat = this.resolveOperatingCostPerFlat(dto);
+    const gasUnitPrice =
+      await this.loadsService.resolveGasPricePerKg(buildingId);
     const [row] = await this.db
       .insert(schema.systemConfigs)
       .values({
+        buildingId,
         gasUnitName: dto.gasUnitName.trim(),
-        gasUnitPrice: dto.gasUnitPrice.toFixed(2),
+        gasUnitPrice: gasUnitPrice.toFixed(2),
         operatingCostPerFlat: operatingCostPerFlat.toFixed(2),
       })
       .returning();
@@ -520,14 +560,17 @@ export class AdminService {
   }
 
   async updateSystemConfig(dto: SystemConfigDto) {
+    const buildingId = this.requireBuildingId(dto.buildingId);
+    await this.loadsService.assertBuilding(buildingId);
     this.requireText(dto.gasUnitName, 'gasUnitName');
-    this.requirePositiveNumber(dto.gasUnitPrice, 'gasUnitPrice');
     const operatingCostPerFlat = this.resolveOperatingCostPerFlat(dto);
+    const gasUnitPrice =
+      await this.loadsService.resolveGasPricePerKg(buildingId);
 
     const [current] = await this.db
       .select()
       .from(schema.systemConfigs)
-      .orderBy(desc(schema.systemConfigs.id))
+      .where(eq(schema.systemConfigs.buildingId, buildingId))
       .limit(1);
 
     if (!current) return this.createSystemConfig(dto);
@@ -536,7 +579,7 @@ export class AdminService {
       .update(schema.systemConfigs)
       .set({
         gasUnitName: dto.gasUnitName.trim(),
-        gasUnitPrice: dto.gasUnitPrice.toFixed(2),
+        gasUnitPrice: gasUnitPrice.toFixed(2),
         operatingCostPerFlat: operatingCostPerFlat.toFixed(2),
         updatedAt: new Date(),
       })
@@ -560,11 +603,11 @@ export class AdminService {
     return dto.operatingCostPerFlat;
   }
 
-  async deleteSystemConfig() {
+  async deleteSystemConfig(buildingId: number) {
     const [current] = await this.db
       .select({ id: schema.systemConfigs.id })
       .from(schema.systemConfigs)
-      .orderBy(desc(schema.systemConfigs.id))
+      .where(eq(schema.systemConfigs.buildingId, buildingId))
       .limit(1);
     if (!current) throw new NotFoundException('System config not found');
     await this.db
@@ -573,17 +616,18 @@ export class AdminService {
     return { deleted: true };
   }
 
+  private requireBuildingId(value: number): number {
+    if (!Number.isFinite(value) || value < 1) {
+      throw new BadRequestException('Building is required');
+    }
+    return Math.trunc(value);
+  }
+
   private requireText(value: string, field: string): string {
     if (!value || value.trim().length === 0) {
       throw new BadRequestException(`${field} is required`);
     }
     return value.trim();
-  }
-
-  private requirePositiveNumber(value: number, field: string): void {
-    if (!Number.isFinite(value) || value <= 0) {
-      throw new BadRequestException(`${field} must be a positive number`);
-    }
   }
 
   private async ensureUniqueUserName(userName: string) {

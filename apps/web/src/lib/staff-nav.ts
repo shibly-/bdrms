@@ -1,14 +1,34 @@
-export type StaffNavItem = {
+export type StaffNavLink = {
   href: string;
   label: string;
 };
 
-/** Shared sidebar for the Staff portal. */
+/** A top-level staff menu: either a direct link (href) or a group with submenus. */
+export type StaffNavItem = {
+  label: string;
+  href?: string;
+  children?: StaffNavLink[];
+};
+
+/** Shared top menu for the Staff portal. */
 export const STAFF_NAV: StaffNavItem[] = [
-  { href: "/staff", label: "Overview" },
-  { href: "/staff/profile", label: "Profile" },
-  { href: "/staff/gas-billing-form", label: "Gas Billing Form" },
-  { href: "/staff/gas-billing-bulk", label: "Bulk Gas Billing" },
-  { href: "/staff/unpaid-gas-bills", label: "Unpaid Gas Bills" },
-  { href: "/staff/gas-billing-history", label: "Gas Billing History" },
+  { label: "Overview", href: "/staff" },
+  { label: "Profile", href: "/staff/profile" },
+  {
+    label: "Billing",
+    children: [
+      { href: "/staff/bill-entry", label: "Bill Entry" },
+      { href: "/staff/bulk-bill-entry", label: "Bulk Bill Entry" },
+      { href: "/staff/unpaid-bills", label: "Unpaid Bills" },
+      { href: "/staff/billing-history", label: "Billing History" },
+    ],
+  },
+  {
+    label: "Loads",
+    children: [
+      { href: "/staff/current-load", label: "Current Load" },
+      { href: "/staff/loading-history", label: "Loading History" },
+      { href: "/staff/usage", label: "Usage" },
+    ],
+  },
 ];

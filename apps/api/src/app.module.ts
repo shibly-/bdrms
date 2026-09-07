@@ -6,6 +6,7 @@ import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 import { BillingModule } from './billing/billing.module';
 import { DatabaseModule } from './database/database.module';
+import { LoadsModule } from './loads/loads.module';
 import { ManagementModule } from './management/management.module';
 
 @Module({
@@ -14,6 +15,7 @@ import { ManagementModule } from './management/management.module';
     DatabaseModule,
     AuthModule,
     BillingModule,
+    LoadsModule,
     ManagementModule,
     AdminModule,
   ],

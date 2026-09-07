@@ -30,16 +30,24 @@ export const ADMIN_NAV_FULL: AdminNavItem[] = [
   {
     label: "Billing",
     children: [
-      { href: "/admin/gas-billing-form", label: "Gas Billing Form" },
-      { href: "/admin/gas-billing-bulk", label: "Bulk Gas Billing" },
-      { href: "/admin/unpaid-gas-bills", label: "Unpaid Gas Bills" },
-      { href: "/admin/gas-billing-history", label: "Gas Billing History" },
-      { href: "/admin/config", label: "Configuration" },
+      { href: "/admin/bill-entry", label: "Bill Entry" },
+      { href: "/admin/bulk-bill-entry", label: "Bulk Bill Entry" },
+      { href: "/admin/unpaid-bills", label: "Unpaid Bills" },
+      { href: "/admin/billing-history", label: "Billing History" },
+    ],
+  },
+  {
+    label: "Loads",
+    children: [
+      { href: "/admin/current-load", label: "Current Load" },
+      { href: "/admin/loading-history", label: "Loading History" },
+      { href: "/admin/usage", label: "Usage" },
+      { href: "/admin/unit-cost", label: "Unit Cost" },
     ],
   },
 ];
 
-/** Building Admin: same as admin except Buildings & Configuration UI/API-sensitive pages. */
+/** Building Admin: same as admin except Buildings & Unit Cost UI/API-sensitive pages. */
 export function getAdminNavForRole(
   role: string | null | undefined,
 ): AdminNavItem[] {
@@ -48,7 +56,7 @@ export function getAdminNavForRole(
       if (item.children) {
         const children = item.children.filter(
           (c) =>
-            c.href !== "/admin/buildings" && c.href !== "/admin/config",
+            c.href !== "/admin/buildings" && c.href !== "/admin/unit-cost",
         );
         if (children.length > 0) acc.push({ ...item, children });
         return acc;
@@ -64,5 +72,10 @@ export function getAdminNavForRole(
 
 export function isBuildingAdminRestrictedPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
-  return pathname === "/admin/buildings" || pathname.startsWith("/admin/buildings/") || pathname === "/admin/config";
+  return (
+    pathname === "/admin/buildings" ||
+    pathname.startsWith("/admin/buildings/") ||
+    pathname === "/admin/unit-cost" ||
+    pathname === "/admin/config"
+  );
 }

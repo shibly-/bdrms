@@ -27,11 +27,20 @@ type AppShellProps = {
   subtitle?: string;
   menu: MenuItem[];
   children: React.ReactNode;
+  /** Extra content inside the page title card (rates, filters, etc.). */
+  headerExtra?: React.ReactNode;
   /** Tighter title card and page spacing (used on billing pages). */
   compact?: boolean;
 };
 
-export function AppShell({ title, subtitle, menu, children, compact = false }: AppShellProps) {
+export function AppShell({
+  title,
+  subtitle,
+  menu,
+  children,
+  headerExtra,
+  compact = false,
+}: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [role, setRole] = useState<string>("");
@@ -289,6 +298,7 @@ export function AppShell({ title, subtitle, menu, children, compact = false }: A
                 {subtitle}
               </p>
             ) : null}
+            {headerExtra}
           </section>
           {children}
         </main>

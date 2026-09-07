@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ADMIN_PORTAL_ROLES } from '../common/admin-roles';
@@ -236,8 +237,8 @@ export class AdminController {
 
   @Get('system-config')
   @Roles(UserRole.Admin)
-  getSystemConfig() {
-    return this.adminService.getSystemConfig();
+  getSystemConfig(@Query('buildingId') buildingId?: string) {
+    return this.adminService.getSystemConfig(Number(buildingId));
   }
 
   @Post('system-config')
@@ -245,8 +246,9 @@ export class AdminController {
   createSystemConfig(
     @Body()
     body: {
+      buildingId: number;
       gasUnitName: string;
-      gasUnitPrice: number;
+      gasUnitPrice?: number;
       operatingCostPerFlat?: number;
     },
   ) {
@@ -258,8 +260,9 @@ export class AdminController {
   updateSystemConfig(
     @Body()
     body: {
+      buildingId: number;
       gasUnitName: string;
-      gasUnitPrice: number;
+      gasUnitPrice?: number;
       operatingCostPerFlat?: number;
     },
   ) {
@@ -268,7 +271,7 @@ export class AdminController {
 
   @Delete('system-config')
   @Roles(UserRole.Admin)
-  deleteSystemConfig() {
-    return this.adminService.deleteSystemConfig();
+  deleteSystemConfig(@Query('buildingId') buildingId?: string) {
+    return this.adminService.deleteSystemConfig(Number(buildingId));
   }
 }
